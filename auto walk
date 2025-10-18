@@ -15,6 +15,7 @@ local rootPart = character:WaitForChild("HumanoidRootPart")
 local recording = false
 local playing = false
 local playingAll = false
+local playAllMode = "loop" -- "loop" or "respawn"
 local recordedPath = {}
 local savedPaths = {}
 local folders = {}
@@ -194,6 +195,7 @@ local function saveConfigSettings()
         writefile(CONFIG_FILE, HttpService:JSONEncode({
             speed = playbackSpeed,
             currentFolder = currentFolder,
+            playAllMode = playAllMode,
             lastUpdate = os.time()
         }))
     end)
@@ -206,6 +208,7 @@ local function loadConfigSettings()
         local config = HttpService:JSONDecode(readfile(CONFIG_FILE))
         playbackSpeed = config.speed or 1
         currentFolder = config.currentFolder or "Default"
+        playAllMode = config.playAllMode or "loop"
     end)
 end
 
@@ -315,9 +318,49 @@ speedBox.TextXAlignment = Enum.TextXAlignment.Center
 speedBox.BorderSizePixel = 0
 Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0, 4)
 
+-- Play All Mode selector
+local modeFrame = Instance.new("Frame", contentFrame)
+modeFrame.Size = UDim2.new(1, -16, 0, 30)
+modeFrame.Position = UDim2.new(0, 8, 0, 77)
+modeFrame.BackgroundColor3 = Color3.new(0.05, 0.05, 0.05)
+modeFrame.BorderSizePixel = 0
+Instance.new("UICorner", modeFrame).CornerRadius = UDim.new(0, 6)
+
+local modeLabel = Instance.new("TextLabel", modeFrame)
+modeLabel.Size = UDim2.new(0, 90, 1, 0)
+modeLabel.Position = UDim2.new(0, 8, 0, 0)
+modeLabel.BackgroundTransparency = 1
+modeLabel.Text = "Play All Mode:"
+modeLabel.TextColor3 = Color3.new(1, 1, 1)
+modeLabel.TextSize = 12
+modeLabel.Font = Enum.Font.Gotham
+modeLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local loopModeBtn = Instance.new("TextButton", modeFrame)
+loopModeBtn.Size = UDim2.new(0, 100, 0, 20)
+loopModeBtn.Position = UDim2.new(0, 105, 0, 5)
+loopModeBtn.BackgroundColor3 = Color3.new(0.3, 0.7, 0.9)
+loopModeBtn.Text = "🔁 Loop"
+loopModeBtn.TextColor3 = Color3.new(1, 1, 1)
+loopModeBtn.TextSize = 11
+loopModeBtn.Font = Enum.Font.GothamBold
+loopModeBtn.BorderSizePixel = 0
+Instance.new("UICorner", loopModeBtn).CornerRadius = UDim.new(0, 4)
+
+local respawnModeBtn = Instance.new("TextButton", modeFrame)
+respawnModeBtn.Size = UDim2.new(0, 100, 0, 20)
+respawnModeBtn.Position = UDim2.new(0, 210, 0, 5)
+respawnModeBtn.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+respawnModeBtn.Text = "🔄 Respawn"
+respawnModeBtn.TextColor3 = Color3.new(1, 1, 1)
+respawnModeBtn.TextSize = 11
+respawnModeBtn.Font = Enum.Font.GothamBold
+respawnModeBtn.BorderSizePixel = 0
+Instance.new("UICorner", respawnModeBtn).CornerRadius = UDim.new(0, 4)
+
 local folderFrame = Instance.new("Frame", contentFrame)
 folderFrame.Size = UDim2.new(1, -16, 0, 30)
-folderFrame.Position = UDim2.new(0, 8, 0, 77)
+folderFrame.Position = UDim2.new(0, 8, 0, 112)
 folderFrame.BackgroundColor3 = Color3.new(0.05, 0.05, 0.05)
 folderFrame.BorderSizePixel = 0
 Instance.new("UICorner", folderFrame).CornerRadius = UDim.new(0, 6)
@@ -380,18 +423,18 @@ local function createButton(name, text, pos, color)
     return btn
 end
 
-local recButton = createButton("Rec", "Record", UDim2.new(0, 8, 0, 115), Color3.new(0.8, 0.2, 0.2))
-local stopButton = createButton("Stop", "Stop", UDim2.new(0, 163, 0, 115), Color3.new(0.6, 0.6, 0.6))
-local saveButton = createButton("Save", "Save Path", UDim2.new(0, 8, 0, 150), Color3.new(0.2, 0.6, 0.8))
-local loadButton = createButton("Load", "Refresh List", UDim2.new(0, 163, 0, 150), Color3.new(0.6, 0.2, 0.8))
-local deleteButton = createButton("Delete", "Clear Recording", UDim2.new(0, 8, 0, 185), Color3.new(0.8, 0.4, 0.2))
-local playButton = createButton("Play", "Play Recording", UDim2.new(0, 163, 0, 185), Color3.new(0.2, 0.8, 0.3))
-local pauseButton = createButton("Pause", "Pause", UDim2.new(0, 8, 0, 220), Color3.new(0.8, 0.8, 0.2))
-local playAllBtn = createButton("PlayAll", "Play All (Loop)", UDim2.new(0, 163, 0, 220), Color3.new(0.3, 0.7, 0.9))
+local recButton = createButton("Rec", "Record", UDim2.new(0, 8, 0, 150), Color3.new(0.8, 0.2, 0.2))
+local stopButton = createButton("Stop", "Stop", UDim2.new(0, 163, 0, 150), Color3.new(0.6, 0.6, 0.6))
+local saveButton = createButton("Save", "Save Path", UDim2.new(0, 8, 0, 185), Color3.new(0.2, 0.6, 0.8))
+local loadButton = createButton("Load", "Refresh List", UDim2.new(0, 163, 0, 185), Color3.new(0.6, 0.2, 0.8))
+local deleteButton = createButton("Delete", "Clear Recording", UDim2.new(0, 8, 0, 220), Color3.new(0.8, 0.4, 0.2))
+local playButton = createButton("Play", "Play Recording", UDim2.new(0, 163, 0, 220), Color3.new(0.2, 0.8, 0.3))
+local pauseButton = createButton("Pause", "Pause", UDim2.new(0, 8, 0, 255), Color3.new(0.8, 0.8, 0.2))
+local playAllBtn = createButton("PlayAll", "Play All", UDim2.new(0, 163, 0, 255), Color3.new(0.3, 0.7, 0.9))
 
 local pathListFrame = Instance.new("ScrollingFrame", contentFrame)
-pathListFrame.Size = UDim2.new(1, -16, 0, 155)
-pathListFrame.Position = UDim2.new(0, 8, 0, 258)
+pathListFrame.Size = UDim2.new(1, -16, 0, 120)
+pathListFrame.Position = UDim2.new(0, 8, 0, 293)
 pathListFrame.BackgroundColor3 = Color3.new(0.05, 0.05, 0.05)
 pathListFrame.BorderSizePixel = 0
 pathListFrame.ScrollBarThickness = 6
@@ -409,6 +452,19 @@ end
 local function updateSpeed()
     playbackSpeed = math.max(0.1, math.min(5, tonumber(speedBox.Text) or 1))
     speedBox.Text = tostring(playbackSpeed)
+    saveConfigSettings()
+end
+
+local function updatePlayAllModeButtons()
+    if playAllMode == "loop" then
+        loopModeBtn.BackgroundColor3 = Color3.new(0.3, 0.7, 0.9)
+        respawnModeBtn.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+        playAllBtn.Text = "Play All (Loop)"
+    else
+        loopModeBtn.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+        respawnModeBtn.BackgroundColor3 = Color3.new(0.7, 0.3, 0.9)
+        playAllBtn.Text = "Play All (Respawn)"
+    end
     saveConfigSettings()
 end
 
@@ -443,7 +499,11 @@ local function stopEverything()
             playAllConnection:Disconnect()
             playAllConnection = nil
         end
-        playAllBtn.Text = "Play All (Loop)"
+        if playAllMode == "loop" then
+            playAllBtn.Text = "Play All (Loop)"
+        else
+            playAllBtn.Text = "Play All (Respawn)"
+        end
         playAllBtn.BackgroundColor3 = Color3.new(0.3, 0.7, 0.9)
     end
     
@@ -610,7 +670,7 @@ local function playSinglePath(pathData, pathName, onComplete)
     end)
 end
 
--- PLAY ALL - Sequential playback with proper synchronization
+-- PLAY ALL - Sequential playback with Loop or Respawn mode
 local function playAllPaths()
     if playingAll then
         stopEverything()
@@ -625,10 +685,15 @@ local function playAllPaths()
     
     stopEverything()
     playingAll = true
-    playAllBtn.Text = "Stop Play All"
+    
+    if playAllMode == "loop" then
+        playAllBtn.Text = "Stop Loop"
+    else
+        playAllBtn.Text = "Stop Play All"
+    end
     playAllBtn.BackgroundColor3 = Color3.new(0.9, 0.3, 0.3)
     
-    print("[PLAY ALL] Started - " .. #currentFolderPaths .. " paths")
+    print("[PLAY ALL] Started - Mode: " .. playAllMode .. " - " .. #currentFolderPaths .. " paths")
     
     local currentPathIndex = 1
     
@@ -638,14 +703,42 @@ local function playAllPaths()
             return 
         end
         
-        -- Loop back to start
+        -- Check if reached end
         if currentPathIndex > #currentFolderPaths then
-            currentPathIndex = 1
-            print("[PLAY ALL] Looping back to start")
+            if playAllMode == "loop" then
+                -- Loop mode: restart from first path
+                currentPathIndex = 1
+                print("[PLAY ALL] Looping back to start")
+                updateStatus("Looping back to start...", Color3.new(0.9, 0.7, 0.3))
+                task.wait(1)
+                if not playingAll then return end
+            else
+                -- Respawn mode: respawn player and stop
+                print("[PLAY ALL] All paths completed - Respawning player")
+                updateStatus("Completed! Respawning...", Color3.new(0.3, 0.9, 0.3))
+                
+                task.wait(0.5)
+                
+                -- Respawn player
+                if character and character:FindFirstChild("Humanoid") then
+                    character.Humanoid.Health = 0
+                end
+                
+                -- Stop play all
+                playingAll = false
+                playAllBtn.Text = "Play All (Respawn)"
+                playAllBtn.BackgroundColor3 = Color3.new(0.3, 0.7, 0.9)
+                
+                task.wait(1)
+                updateStatus("Ready!", Color3.new(0.7, 0.9, 0.7))
+                return
+            end
         end
         
         local pathInfo = currentFolderPaths[currentPathIndex]
-        updateStatus("Playing " .. currentPathIndex .. "/" .. #currentFolderPaths .. ": " .. pathInfo.name, Color3.new(0.3, 0.9, 0.3))
+        
+        local modeText = playAllMode == "loop" and "Loop" or "Respawn"
+        updateStatus("[" .. modeText .. "] " .. currentPathIndex .. "/" .. #currentFolderPaths .. ": " .. pathInfo.name, Color3.new(0.3, 0.9, 0.3))
         print("[PLAY ALL] Path " .. currentPathIndex .. "/" .. #currentFolderPaths .. ": " .. pathInfo.name)
         
         playSinglePath(pathInfo.data, pathInfo.name, function()
@@ -1063,6 +1156,19 @@ end
 minimizeButton.MouseButton1Click:Connect(toggleMinimize)
 speedBox.FocusLost:Connect(updateSpeed)
 
+-- Mode selection buttons
+loopModeBtn.MouseButton1Click:Connect(function()
+    playAllMode = "loop"
+    updatePlayAllModeButtons()
+    updateStatus("Mode: Loop (infinite)", Color3.new(0.3, 0.9, 0.3))
+end)
+
+respawnModeBtn.MouseButton1Click:Connect(function()
+    playAllMode = "respawn"
+    updatePlayAllModeButtons()
+    updateStatus("Mode: Respawn (one-time)", Color3.new(0.7, 0.3, 0.9))
+end)
+
 folderDropdown.MouseButton1Click:Connect(showFolderMenu)
 newFolderBtn.MouseButton1Click:Connect(createNewFolder)
 delFolderBtn.MouseButton1Click:Connect(deleteFolder)
@@ -1123,6 +1229,7 @@ print(string.rep("=", 60))
 
 loadConfigSettings()
 speedBox.Text = tostring(playbackSpeed)
+updatePlayAllModeButtons()
 
 local loadedCount = autoLoadAllPaths()
 folderDropdown.Text = currentFolder .. " ▼"
@@ -1138,6 +1245,8 @@ print("\n✓ Script ready!")
 print("✓ COMPLETE REWRITE - All logic synchronized")
 print("✓ Recording: Clean start/stop")
 print("✓ Playing: Proper completion detection")
-print("✓ Play All: Sequential with callbacks")
+print("✓ Play All Modes:")
+print("  - Loop: Infinite loop through all paths")
+print("  - Respawn: Play all paths once, then respawn")
 print("✓ No conflicts between modes")
 print(string.rep("=", 60) .. "\n")
