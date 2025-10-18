@@ -1,6 +1,7 @@
 -- WarpahSpectate Pro v5.3
 -- Fixed Free Camera Controls
 -- Mobile & Desktop Compatible
+-- Changed Reset to TP Button
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -200,15 +201,15 @@ local function createGUI()
     NextBtn.Font = Enum.Font.Gotham
     NextBtn.Parent = ControlsFrame
     
-    local ResetBtn = Instance.new("TextButton")
-    ResetBtn.Size = UDim2.new(0.34, -2, 0, 18)
-    ResetBtn.Position = UDim2.new(0.66, 2, 0, 3)
-    ResetBtn.BackgroundColor3 = Color3.fromRGB(100, 150, 80)
-    ResetBtn.Text = "Reset"
-    ResetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ResetBtn.TextSize = 9
-    ResetBtn.Font = Enum.Font.Gotham
-    ResetBtn.Parent = ControlsFrame
+    local TpBtn = Instance.new("TextButton")
+    TpBtn.Size = UDim2.new(0.34, -2, 0, 18)
+    TpBtn.Position = UDim2.new(0.66, 2, 0, 3)
+    TpBtn.BackgroundColor3 = Color3.fromRGB(150, 80, 200)
+    TpBtn.Text = "TP 🚀"
+    TpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TpBtn.TextSize = 9
+    TpBtn.Font = Enum.Font.Gotham
+    TpBtn.Parent = ControlsFrame
     
     local InfoLabel = Instance.new("TextLabel")
     InfoLabel.Size = UDim2.new(1, -6, 0, 26)
@@ -221,7 +222,7 @@ local function createGUI()
     InfoLabel.TextWrapped = true
     InfoLabel.Parent = ControlsFrame
     
-    for _, btn in pairs({PrevBtn, NextBtn, ResetBtn}) do
+    for _, btn in pairs({PrevBtn, NextBtn, TpBtn}) do
         local corner = Instance.new("UICorner")
         corner.CornerRadius = UDim.new(0, 3)
         corner.Parent = btn
@@ -238,7 +239,7 @@ local function createGUI()
         PlayerListFrame = PlayerListFrame,
         PrevBtn = PrevBtn,
         NextBtn = NextBtn,
-        ResetBtn = ResetBtn
+        TpBtn = TpBtn
     }
     
     return Config.UI
@@ -446,14 +447,29 @@ local function switchPlayer(direction)
     updatePlayerList()
 end
 
--- Reset camera
-local function resetCamera()
-    Config.CameraAngleX = 0
-    Config.CameraAngleY = 0
-    Config.CameraDistance = 10
-    Config.CurrentAngleX = 0
-    Config.CurrentAngleY = 0
-    Config.CurrentDistance = 10
+-- Teleport to target player
+local function teleportToPlayer()
+    if not Config.CurrentTarget then 
+        print("⚠️ No target player selected!")
+        return 
+    end
+    
+    local target = Config.CurrentTarget
+    if not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
+        print("⚠️ Target player character not found!")
+        return
+    end
+    
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        print("⚠️ Your character not found!")
+        return
+    end
+    
+    -- Teleport local player to target
+    local targetPos = target.Character.HumanoidRootPart.Position
+    LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(targetPos + Vector3.new(3, 0, 3))
+    
+    print("✅ Teleported to " .. target.DisplayName .. "!")
 end
 
 -- Toggle spectate
@@ -471,7 +487,6 @@ local function toggleSpectate()
         end
         
         Camera.CameraType = Enum.CameraType.Scriptable
-        resetCamera()
     else
         Config.UI.ToggleBtn.Text = "Enable Spectate"
         Config.UI.ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 200)
@@ -520,7 +535,7 @@ local function initialize()
     ui.ToggleBtn.MouseButton1Click:Connect(toggleSpectate)
     ui.PrevBtn.MouseButton1Click:Connect(function() switchPlayer(-1) end)
     ui.NextBtn.MouseButton1Click:Connect(function() switchPlayer(1) end)
-    ui.ResetBtn.MouseButton1Click:Connect(resetCamera)
+    ui.TpBtn.MouseButton1Click:Connect(teleportToPlayer)
     
     Config.Connections[#Config.Connections + 1] = RunService.RenderStepped:Connect(updateCamera)
     
@@ -536,6 +551,7 @@ local function initialize()
     print("✅ Warpah Spectate Pro v5.3 Loaded!")
     print("📱 MOBILE: Drag 1 finger = Rotate | Pinch = Zoom")
     print("🖱️ PC: Hold & Drag = Rotate | Scroll = Zoom")
+    print("🚀 Press TP button to teleport to spectated player!")
 end
 
 -- Keyboard shortcuts
@@ -548,8 +564,8 @@ UserInputService.InputBegan:Connect(function(input, processed)
         switchPlayer(1)
     elseif input.KeyCode == Enum.KeyCode.P and Config.Enabled then
         switchPlayer(-1)
-    elseif input.KeyCode == Enum.KeyCode.R and Config.Enabled then
-        resetCamera()
+    elseif input.KeyCode == Enum.KeyCode.T and Config.Enabled then
+        teleportToPlayer()
     end
 end)
 
