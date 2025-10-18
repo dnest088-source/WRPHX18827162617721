@@ -1,5 +1,5 @@
--- Warpah Teleport - Compact Professional GUI for Delta Executor Android
--- Ultra-compact design with full functionality + Play All + Auto Loop Feature
+-- Warpah Teleport v3.0 - Professional GUI with Folder System
+-- Ultra-compact design with folders organization + Play All + Auto Loop
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -10,20 +10,23 @@ local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Saved teleports storage
+-- Saved teleports storage with folder system
 local savedTeleports = {}
+local folders = {}
+local currentFolder = nil -- nil = root/no folder
 local isPlayingAll = false
 local playAllDelay = 3
 local autoRespawn = true
-local autoLoop = false  -- NEW: Auto Loop feature
+local autoLoop = false
 
--- NEW: Data persistence system
+-- Data persistence
 local SAVE_FILE_NAME = "WarpahTeleportData_" .. game.PlaceId .. ".json"
 
 local function saveDataToFile()
     local success, err = pcall(function()
         local data = {
             teleports = savedTeleports,
+            folders = folders,
             settings = {
                 autoRespawn = autoRespawn,
                 autoLoop = autoLoop,
@@ -61,11 +64,11 @@ screenGui.Name = "WarpahTeleportGUI"
 screenGui.Parent = playerGui
 screenGui.ResetOnSpawn = false
 
--- Main Frame - Ultra compact (increased height for new features)
+-- Main Frame - Ultra compact (increased height for folder system)
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 280, 0, 380)
-mainFrame.Position = UDim2.new(0.5, -140, 0.5, -190)
+mainFrame.Size = UDim2.new(0, 280, 0, 440)
+mainFrame.Position = UDim2.new(0.5, -140, 0.5, -220)
 mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
@@ -356,7 +359,7 @@ local saveBtnCorner = Instance.new("UICorner")
 saveBtnCorner.CornerRadius = UDim.new(0, 5)
 saveBtnCorner.Parent = saveBtn
 
--- NEW: Play All Control Frame (UPDATED with Auto Loop toggle)
+-- Play All Control Frame
 local playAllFrame = Instance.new("Frame")
 playAllFrame.Size = UDim2.new(1, 0, 0, 46)
 playAllFrame.Position = UDim2.new(0, 0, 0, 130)
@@ -413,7 +416,6 @@ local delayCorner = Instance.new("UICorner")
 delayCorner.CornerRadius = UDim.new(0, 4)
 delayCorner.Parent = delayInput
 
--- NEW: Auto Loop Toggle Button
 local loopToggle = Instance.new("TextButton")
 loopToggle.Size = UDim2.new(0, 35, 1, 0)
 loopToggle.Position = UDim2.new(0, 65, 0, 0)
@@ -474,10 +476,86 @@ local stopAllBtnCorner = Instance.new("UICorner")
 stopAllBtnCorner.CornerRadius = UDim.new(0, 5)
 stopAllBtnCorner.Parent = stopAllBtn
 
+-- NEW: Folder Management Frame
+local folderFrame = Instance.new("Frame")
+folderFrame.Size = UDim2.new(1, 0, 0, 46)
+folderFrame.Position = UDim2.new(0, 0, 0, 180)
+folderFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+folderFrame.BorderSizePixel = 0
+folderFrame.Parent = content
+
+local folderFrameCorner = Instance.new("UICorner")
+folderFrameCorner.CornerRadius = UDim.new(0, 8)
+folderFrameCorner.Parent = folderFrame
+
+local folderTitle = Instance.new("TextLabel")
+folderTitle.Size = UDim2.new(1, -8, 0, 18)
+folderTitle.Position = UDim2.new(0, 4, 0, 2)
+folderTitle.BackgroundTransparency = 1
+folderTitle.Text = "📁 Folder Manager"
+folderTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+folderTitle.TextSize = 10
+folderTitle.Font = Enum.Font.GothamBold
+folderTitle.TextXAlignment = Enum.TextXAlignment.Left
+folderTitle.Parent = folderFrame
+
+local folderControlFrame = Instance.new("Frame")
+folderControlFrame.Size = UDim2.new(1, -8, 0, 22)
+folderControlFrame.Position = UDim2.new(0, 4, 0, 20)
+folderControlFrame.BackgroundTransparency = 1
+folderControlFrame.Parent = folderFrame
+
+local folderNameInput = Instance.new("TextBox")
+folderNameInput.Size = UDim2.new(0.5, -2, 1, 0)
+folderNameInput.Position = UDim2.new(0, 0, 0, 0)
+folderNameInput.BackgroundColor3 = Color3.fromRGB(35, 35, 55)
+folderNameInput.BorderSizePixel = 0
+folderNameInput.Text = ""
+folderNameInput.PlaceholderText = "Folder name..."
+folderNameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+folderNameInput.PlaceholderColor3 = Color3.fromRGB(120, 120, 140)
+folderNameInput.TextSize = 9
+folderNameInput.Font = Enum.Font.Gotham
+folderNameInput.Parent = folderControlFrame
+
+local folderNameCorner = Instance.new("UICorner")
+folderNameCorner.CornerRadius = UDim.new(0, 4)
+folderNameCorner.Parent = folderNameInput
+
+local newFolderBtn = Instance.new("TextButton")
+newFolderBtn.Size = UDim2.new(0.25, -2, 1, 0)
+newFolderBtn.Position = UDim2.new(0.5, 0, 0, 0)
+newFolderBtn.BackgroundColor3 = Color3.fromRGB(13, 110, 253)
+newFolderBtn.BorderSizePixel = 0
+newFolderBtn.Text = "➕"
+newFolderBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+newFolderBtn.TextSize = 11
+newFolderBtn.Font = Enum.Font.GothamBold
+newFolderBtn.Parent = folderControlFrame
+
+local newFolderCorner = Instance.new("UICorner")
+newFolderCorner.CornerRadius = UDim.new(0, 4)
+newFolderCorner.Parent = newFolderBtn
+
+local showRootBtn = Instance.new("TextButton")
+showRootBtn.Size = UDim2.new(0.25, -2, 1, 0)
+showRootBtn.Position = UDim2.new(0.75, 0, 0, 0)
+showRootBtn.BackgroundColor3 = Color3.fromRGB(108, 117, 125)
+showRootBtn.BorderSizePixel = 0
+showRootBtn.Text = "🏠"
+showRootBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+showRootBtn.TextSize = 11
+showRootBtn.Font = Enum.Font.GothamBold
+showRootBtn.Parent = folderControlFrame
+
+local showRootCorner = Instance.new("UICorner")
+showRootCorner.CornerRadius = UDim.new(0, 4)
+showRootCorner.Parent = showRootBtn
+
 -- Saved teleports - compact list (adjusted position)
 local savedFrame = Instance.new("Frame")
 savedFrame.Size = UDim2.new(1, 0, 0, 150)
-savedFrame.Position = UDim2.new(0, 0, 0, 180)
+savedFrame.Position = UDim2.new(0, 0, 0, 230)
 savedFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
 savedFrame.BorderSizePixel = 0
 savedFrame.Parent = content
@@ -568,9 +646,20 @@ local function getCurrentPosition()
     end
 end
 
--- NEW: Play All Function with Auto Loop support
+local function getTeleportsInFolder(folderName)
+    local teleports = {}
+    for _, teleport in ipairs(savedTeleports) do
+        if teleport.folder == folderName then
+            table.insert(teleports, teleport)
+        end
+    end
+    return teleports
+end
+
 local function playAllTeleports()
-    if #savedTeleports == 0 then
+    local teleportsToPlay = currentFolder and getTeleportsInFolder(currentFolder) or savedTeleports
+    
+    if #teleportsToPlay == 0 then
         playAllBtn.Text = "❌ Empty"
         playAllBtn.BackgroundColor3 = Color3.fromRGB(255, 69, 58)
         wait(1)
@@ -586,24 +675,21 @@ local function playAllTeleports()
     local delay = tonumber(delayInput.Text) or 3
     if delay < 0.5 then delay = 0.5 end
     
-    -- Loop feature: repeat until stopped
     repeat
-        for i, teleport in ipairs(savedTeleports) do
+        for i, teleport in ipairs(teleportsToPlay) do
             if not isPlayingAll then break end
             
             if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                 player.Character.HumanoidRootPart.CFrame = CFrame.new(teleport.x, teleport.y, teleport.z)
                 
                 if autoLoop then
-                    playAllBtn.Text = string.format("🔁 %d/%d", i, #savedTeleports)
+                    playAllBtn.Text = string.format("🔁 %d/%d", i, #teleportsToPlay)
                 else
-                    playAllBtn.Text = string.format("⏸ %d/%d", i, #savedTeleports)
+                    playAllBtn.Text = string.format("⏸ %d/%d", i, #teleportsToPlay)
                 end
                 
-                -- Check if this is the last teleport
-                if i == #savedTeleports then
+                if i == #teleportsToPlay then
                     wait(delay)
-                    -- Auto respawn after last teleport only if enabled and not looping
                     if autoRespawn and not autoLoop and player.Character and player.Character:FindFirstChild("Humanoid") then
                         player.Character.Humanoid.Health = 0
                         playAllBtn.Text = "♻ Respawn..."
@@ -615,7 +701,6 @@ local function playAllTeleports()
             end
         end
         
-        -- If auto loop is enabled, continue. Otherwise, break
         if not autoLoop then break end
         
     until not isPlayingAll
@@ -638,7 +723,6 @@ local function stopPlayAll()
     playAllBtn.Text = "▶️ Play"
 end
 
--- NEW: Toggle Auto Loop function
 local function toggleLoop()
     autoLoop = not autoLoop
     if autoLoop then
@@ -648,7 +732,6 @@ local function toggleLoop()
         loopToggle.Text = "🔁 OFF"
         loopToggle.BackgroundColor3 = Color3.fromRGB(120, 120, 140)
     end
-    -- Save settings to file
     saveDataToFile()
 end
 
@@ -661,11 +744,126 @@ local function toggleRespawn()
         respawnToggle.Text = "♻ OFF"
         respawnToggle.BackgroundColor3 = Color3.fromRGB(120, 120, 140)
     end
-    -- Save settings to file
     saveDataToFile()
 end
 
-local function createSavedItem(name, x, y, z)
+local function updateScrollSize()
+    local displayItems = 0
+    for _, child in ipairs(savedScroll:GetChildren()) do
+        if child:IsA("Frame") or child:IsA("TextButton") then
+            displayItems = displayItems + 1
+        end
+    end
+    local contentSize = displayItems * 28
+    savedScroll.CanvasSize = UDim2.new(0, 0, 0, contentSize)
+end
+
+local function clearScrollContent()
+    for _, child in ipairs(savedScroll:GetChildren()) do
+        if child:IsA("Frame") or child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+end
+
+local function createFolderItem(folderName)
+    local item = Instance.new("TextButton")
+    item.Size = UDim2.new(1, -4, 0, 26)
+    item.BackgroundColor3 = Color3.fromRGB(45, 45, 75)
+    item.BorderSizePixel = 0
+    item.AutoButtonColor = false
+    item.Parent = savedScroll
+    
+    local itemCorner = Instance.new("UICorner")
+    itemCorner.CornerRadius = UDim.new(0, 4)
+    itemCorner.Parent = item
+    
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(0.6, -4, 1, 0)
+    nameLabel.Position = UDim2.new(0, 4, 0, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = "📁 " .. folderName
+    nameLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+    nameLabel.TextSize = 9
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.Parent = item
+    
+    local countLabel = Instance.new("TextLabel")
+    countLabel.Size = UDim2.new(0.2, -4, 1, 0)
+    countLabel.Position = UDim2.new(0.6, 0, 0, 0)
+    countLabel.BackgroundTransparency = 1
+    local count = #getTeleportsInFolder(folderName)
+    countLabel.Text = "(" .. count .. ")"
+    countLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
+    countLabel.TextSize = 8
+    countLabel.Font = Enum.Font.Gotham
+    countLabel.TextXAlignment = Enum.TextXAlignment.Left
+    countLabel.Parent = item
+    
+    local openBtn = Instance.new("TextButton")
+    openBtn.Size = UDim2.new(0, 28, 0, 18)
+    openBtn.Position = UDim2.new(1, -48, 0, 4)
+    openBtn.BackgroundColor3 = Color3.fromRGB(13, 110, 253)
+    openBtn.BorderSizePixel = 0
+    openBtn.Text = "Open"
+    openBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    openBtn.TextSize = 7
+    openBtn.Font = Enum.Font.GothamBold
+    openBtn.Parent = item
+    
+    local openBtnCorner = Instance.new("UICorner")
+    openBtnCorner.CornerRadius = UDim.new(0, 3)
+    openBtnCorner.Parent = openBtn
+    
+    local delBtn = Instance.new("TextButton")
+    delBtn.Size = UDim2.new(0, 18, 0, 18)
+    delBtn.Position = UDim2.new(1, -18, 0, 4)
+    delBtn.BackgroundColor3 = Color3.fromRGB(255, 69, 58)
+    delBtn.BorderSizePixel = 0
+    delBtn.Text = "✕"
+    delBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    delBtn.TextSize = 7
+    delBtn.Font = Enum.Font.GothamBold
+    delBtn.Parent = item
+    
+    local delBtnCorner = Instance.new("UICorner")
+    delBtnCorner.CornerRadius = UDim.new(0, 3)
+    delBtnCorner.Parent = delBtn
+    
+    openBtn.MouseButton1Click:Connect(function()
+        currentFolder = folderName
+        refreshDisplay()
+    end)
+    
+    delBtn.MouseButton1Click:Connect(function()
+        for i = #savedTeleports, 1, -1 do
+            if savedTeleports[i].folder == folderName then
+                table.remove(savedTeleports, i)
+            end
+        end
+        
+        for i, folder in ipairs(folders) do
+            if folder == folderName then
+                table.remove(folders, i)
+                break
+            end
+        end
+        
+        saveDataToFile()
+        refreshDisplay()
+    end)
+    
+    item.MouseEnter:Connect(function()
+        item.BackgroundColor3 = Color3.fromRGB(55, 55, 85)
+    end)
+    
+    item.MouseLeave:Connect(function()
+        item.BackgroundColor3 = Color3.fromRGB(45, 45, 75)
+    end)
+end
+
+local function createSavedItem(name, x, y, z, folder)
     local item = Instance.new("Frame")
     item.Size = UDim2.new(1, -4, 0, 26)
     item.BackgroundColor3 = Color3.fromRGB(35, 35, 55)
@@ -728,7 +926,6 @@ local function createSavedItem(name, x, y, z)
     delBtnCorner.CornerRadius = UDim.new(0, 3)
     delBtnCorner.Parent = delBtn
     
-    -- Events
     goBtn.MouseButton1Click:Connect(function()
         if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             player.Character.HumanoidRootPart.CFrame = CFrame.new(x, y, z)
@@ -740,19 +937,16 @@ local function createSavedItem(name, x, y, z)
     
     delBtn.MouseButton1Click:Connect(function()
         for i, saved in ipairs(savedTeleports) do
-            if saved.name == name then
+            if saved.name == name and saved.x == x and saved.y == y and saved.z == z then
                 table.remove(savedTeleports, i)
                 break
             end
         end
         item:Destroy()
         updateScrollSize()
-        
-        -- NEW: Save to file after deletion
         saveDataToFile()
     end)
     
-    -- Hover effect
     item.MouseEnter:Connect(function()
         item.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
     end)
@@ -762,9 +956,63 @@ local function createSavedItem(name, x, y, z)
     end)
 end
 
-local function updateScrollSize()
-    local contentSize = #savedTeleports * 28
-    savedScroll.CanvasSize = UDim2.new(0, 0, 0, contentSize)
+function refreshDisplay()
+    clearScrollContent()
+    
+    if currentFolder then
+        savedTitle.Text = "⭐ " .. currentFolder
+        
+        local teleportsInFolder = getTeleportsInFolder(currentFolder)
+        for _, teleport in ipairs(teleportsInFolder) do
+            createSavedItem(teleport.name, teleport.x, teleport.y, teleport.z, teleport.folder)
+        end
+    else
+        savedTitle.Text = "⭐ Saved Warps"
+        
+        for _, folderName in ipairs(folders) do
+            createFolderItem(folderName)
+        end
+        
+        for _, teleport in ipairs(savedTeleports) do
+            if not teleport.folder then
+                createSavedItem(teleport.name, teleport.x, teleport.y, teleport.z, nil)
+            end
+        end
+    end
+    
+    updateScrollSize()
+end
+
+local function createNewFolder()
+    local folderName = folderNameInput.Text
+    if folderName == "" then
+        newFolderBtn.Text = "❌"
+        wait(1)
+        newFolderBtn.Text = "➕"
+        return
+    end
+    
+    for _, folder in ipairs(folders) do
+        if folder == folderName then
+            newFolderBtn.Text = "⚠️"
+            wait(1)
+            newFolderBtn.Text = "➕"
+            return
+        end
+    end
+    
+    table.insert(folders, folderName)
+    folderNameInput.Text = ""
+    newFolderBtn.Text = "✅"
+    saveDataToFile()
+    refreshDisplay()
+    wait(1)
+    newFolderBtn.Text = "➕"
+end
+
+local function showRoot()
+    currentFolder = nil
+    refreshDisplay()
 end
 
 local function savePosition()
@@ -780,13 +1028,23 @@ local function savePosition()
     
     if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local pos = player.Character.HumanoidRootPart.Position
-        local saveData = {name = name, x = pos.X, y = pos.Y, z = pos.Z}
+        local saveData = {
+            name = name, 
+            x = pos.X, 
+            y = pos.Y, 
+            z = pos.Z,
+            folder = currentFolder
+        }
         
         table.insert(savedTeleports, saveData)
-        createSavedItem(name, pos.X, pos.Y, pos.Z)
-        updateScrollSize()
         
-        -- NEW: Save to file
+        if currentFolder then
+            createSavedItem(name, pos.X, pos.Y, pos.Z, currentFolder)
+            updateScrollSize()
+        else
+            refreshDisplay()
+        end
+        
         saveDataToFile()
         
         saveNameInput.Text = ""
@@ -809,8 +1067,9 @@ teleportBtn.MouseButton1Click:Connect(teleportPlayer)
 getCurrentBtn.MouseButton1Click:Connect(getCurrentPosition)
 saveBtn.MouseButton1Click:Connect(savePosition)
 minimizeBtn.MouseButton1Click:Connect(toggleMinimize)
+newFolderBtn.MouseButton1Click:Connect(createNewFolder)
+showRootBtn.MouseButton1Click:Connect(showRoot)
 
--- NEW: Play All Events
 playAllBtn.MouseButton1Click:Connect(function()
     if not isPlayingAll then
         spawn(playAllTeleports)
@@ -818,9 +1077,7 @@ playAllBtn.MouseButton1Click:Connect(function()
 end)
 
 stopAllBtn.MouseButton1Click:Connect(stopPlayAll)
-
 loopToggle.MouseButton1Click:Connect(toggleLoop)
-
 respawnToggle.MouseButton1Click:Connect(toggleRespawn)
 
 delayInput.FocusLost:Connect(function()
@@ -831,7 +1088,6 @@ delayInput.FocusLost:Connect(function()
     else
         playAllDelay = delay
     end
-    -- Save delay setting to file
     saveDataToFile()
 end)
 
@@ -862,8 +1118,9 @@ hover(getCurrentBtn, Color3.fromRGB(19, 132, 150), Color3.fromRGB(23, 162, 184))
 hover(saveBtn, Color3.fromRGB(110, 35, 180), Color3.fromRGB(138, 43, 226))
 hover(playAllBtn, Color3.fromRGB(230, 136, 0), Color3.fromRGB(255, 152, 0))
 hover(stopAllBtn, Color3.fromRGB(200, 35, 51), Color3.fromRGB(220, 53, 69))
+hover(newFolderBtn, Color3.fromRGB(10, 88, 202), Color3.fromRGB(13, 110, 253))
+hover(showRootBtn, Color3.fromRGB(86, 94, 100), Color3.fromRGB(108, 117, 125))
 
--- NEW: Loop toggle hover effect
 loopToggle.MouseEnter:Connect(function()
     if autoLoop then
         TweenService:Create(loopToggle, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(34, 139, 58)}):Play()
@@ -880,7 +1137,6 @@ loopToggle.MouseLeave:Connect(function()
     end
 end)
 
--- Respawn toggle hover effect
 respawnToggle.MouseEnter:Connect(function()
     if autoRespawn then
         TweenService:Create(respawnToggle, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(34, 139, 58)}):Play()
@@ -919,29 +1175,28 @@ focusEffect(yInput)
 focusEffect(zInput)
 focusEffect(saveNameInput)
 focusEffect(delayInput)
+focusEffect(folderNameInput)
 
 -- Loading animation
 mainFrame.Size = UDim2.new(0, 0, 0, 0)
 mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 local loadTween = TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
     Size = originalSize,
-    Position = UDim2.new(0.5, -140, 0.5, -190)
+    Position = UDim2.new(0.5, -140, 0.5, -220)
 })
 loadTween:Play()
 
--- NEW: Load saved data on startup
+-- Load saved data on startup
 local loadedData = loadDataFromFile()
 if loadedData then
-    -- Load saved teleports
     if loadedData.teleports then
         savedTeleports = loadedData.teleports
-        for _, teleport in ipairs(savedTeleports) do
-            createSavedItem(teleport.name, teleport.x, teleport.y, teleport.z)
-        end
-        updateScrollSize()
     end
     
-    -- Load settings
+    if loadedData.folders then
+        folders = loadedData.folders
+    end
+    
     if loadedData.settings then
         if loadedData.settings.autoRespawn ~= nil then
             autoRespawn = loadedData.settings.autoRespawn
@@ -971,8 +1226,10 @@ if loadedData then
         end
     end
     
-    print("✅ Loaded " .. #savedTeleports .. " saved teleports from file")
+    print("✅ Loaded " .. #savedTeleports .. " teleports and " .. #folders .. " folders")
 end
+
+refreshDisplay()
 
 -- Position update loop
 RunService.Heartbeat:Connect(updatePosition)
@@ -988,14 +1245,19 @@ saveNameInput.FocusLost:Connect(function(enterPressed)
     if enterPressed and saveNameInput.Text ~= "" then savePosition() end
 end)
 
+folderNameInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed and folderNameInput.Text ~= "" then createNewFolder() end
+end)
+
 -- Console
-print("✅ Warpah Teleport v2.8 loaded!")
-print("🎯 Ultra-compact design with Play All + Auto Loop feature")
+print("✅ Warpah Teleport v3.0 loaded!")
+print("🎯 Ultra-compact design with Folder System")
+print("📁 Create folders to organize your teleports")
 print("▶️ Auto-play all saved teleports with custom delay")
 print("🔁 Auto Loop: Repeat teleports endlessly until stopped")
 print("♻ Auto Respawn: ON/OFF toggle after last teleport")
-print("💾 Data Persistence: Teleports saved to file automatically")
-print("📁 Save file: " .. SAVE_FILE_NAME)
+print("💾 Data Persistence: Everything saved automatically")
+print("📂 File: " .. SAVE_FILE_NAME)
 print("⚡ Perfect for Delta Executor Android")
 
 updatePosition()
