@@ -1,0 +1,1147 @@
+-- Auto Walk Script v3.1 - ALL BUGS FIXED
+-- Save fixed, Delete folder, Proper folder logic, Natural animations
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+local recording = false
+local playing = false
+local playingAll = false
+local recordedPath = {}
+local savedPaths = {}
+local folders = {}
+local currentFolder = "Default"
+local playConnection = nil
+local recordConnection = nil
+local playbackSpeed = 1
+
+-- Optimasi untuk recording panjang
+local RECORD_INTERVAL = 0.05 -- Record lebih sering untuk smooth
+local lastRecordTime = 0
+
+-- ========== FILE SYSTEM ==========
+local FOLDER_NAME = "Delta/AutoWalkWarpah"
+local CONFIG_FILE = FOLDER_NAME .. "/config.json"
+
+local function ensureFolderExists()
+    pcall(function()
+        if makefolder then
+            makefolder("Delta")
+            task.wait(0.05)
+            makefolder(FOLDER_NAME)
+            task.wait(0.05)
+        end
+    end)
+end
+
+local function savePathToFile(pathName, pathData, folderName)
+    local success = pcall(function()
+        if not writefile then 
+            warn("writefile not available")
+            return 
+        end
+        
+        ensureFolderExists()
+        
+        local serializableData = {}
+        for i, point in ipairs(pathData) do
+            local rx, ry, rz = point.rotation:ToEulerAnglesXYZ()
+            serializableData[i] = {
+                x = point.position.X,
+                y = point.position.Y,
+                z = point.position.Z,
+                rx = rx,
+                ry = ry,
+                rz = rz,
+                time = point.timestamp
+            }
+        end
+        
+        local filePath = FOLDER_NAME .. "/" .. pathName .. ".json"
+        writefile(filePath, HttpService:JSONEncode({
+            name = pathName,
+            folder = folderName or "Default",
+            points = serializableData,
+            count = #serializableData,
+            savedAt = os.time()
+        }))
+        
+        print("[SAVED] " .. pathName .. " (" .. #serializableData .. " points) to folder: " .. (folderName or "Default"))
+    end)
+    
+    return success
+end
+
+local function loadPathFromFile(fileName)
+    local success, result = pcall(function()
+        if not readfile or not isfile then return nil end
+        
+        local fullPath = FOLDER_NAME .. "/" .. fileName
+        if not isfile(fullPath) then 
+            warn("File not found: " .. fullPath)
+            return nil 
+        end
+        
+        local fileContent = readfile(fullPath)
+        local fileData = HttpService:JSONDecode(fileContent)
+        
+        if not fileData or not fileData.points then 
+            warn("Invalid file format: " .. fileName)
+            return nil 
+        end
+        
+        local loadedPath = {}
+        for i, point in ipairs(fileData.points) do
+            local pos = Vector3.new(point.x, point.y, point.z)
+            local rot = CFrame.fromEulerAnglesXYZ(point.rx or 0, point.ry or 0, point.rz or 0)
+            
+            loadedPath[i] = {
+                position = pos,
+                rotation = rot,
+                timestamp = point.time or (i * RECORD_INTERVAL)
+            }
+        end
+        
+        print("[LOADED] " .. fileData.name .. " (" .. #loadedPath .. " points) from folder: " .. (fileData.folder or "Default"))
+        return {
+            name = fileData.name, 
+            data = loadedPath,
+            folder = fileData.folder or "Default"
+        }
+    end)
+    
+    if success and result then
+        return result
+    else
+        warn("Failed to load: " .. fileName .. " - " .. tostring(result))
+        return nil
+    end
+end
+
+local function getAllSavedFiles()
+    local files = {}
+    pcall(function()
+        if listfiles and isfolder then
+            if not isfolder(FOLDER_NAME) then
+                ensureFolderExists()
+                return
+            end
+            
+            for _, path in pairs(listfiles(FOLDER_NAME)) do
+                local name = path:match("([^/\\]+)$")
+                if name and name:find("%.json$") and name ~= "config.json" then
+                    table.insert(files, name)
+                end
+            end
+        end
+    end)
+    return files
+end
+
+local function deletePathFile(pathName)
+    local success = pcall(function()
+        if delfile and isfile then
+            local path = FOLDER_NAME .. "/" .. pathName .. ".json"
+            if isfile(path) then
+                delfile(path)
+                print("[DELETED] " .. pathName)
+                return true
+            end
+        end
+    end)
+    return success
+end
+
+local function autoLoadAllPaths()
+    local files = getAllSavedFiles()
+    local loadedCount = 0
+    folders = {}
+    savedPaths = {}
+    
+    print("\n=== AUTO-LOADING SAVED PATHS ===")
+    
+    for _, fileName in pairs(files) do
+        local pathData = loadPathFromFile(fileName)
+        if pathData and pathData.data then
+            local folderName = pathData.folder or "Default"
+            
+            -- Create folder if not exists
+            if not folders[folderName] then
+                folders[folderName] = {}
+            end
+            
+            -- Add to folder
+            table.insert(folders[folderName], {
+                name = pathData.name,
+                data = pathData.data
+            })
+            
+            savedPaths[pathData.name] = {
+                data = pathData.data,
+                folder = folderName
+            }
+            loadedCount = loadedCount + 1
+        end
+    end
+    
+    -- Ensure Default folder exists
+    if not folders["Default"] then
+        folders["Default"] = {}
+    end
+    
+    if loadedCount > 0 then
+        print("[SUCCESS] Loaded " .. loadedCount .. " saved path(s)")
+    else
+        print("[INFO] No saved paths found")
+    end
+    print("================================\n")
+    
+    return loadedCount
+end
+
+local function saveConfigSettings()
+    pcall(function()
+        if not writefile then return end
+        ensureFolderExists()
+        
+        writefile(CONFIG_FILE, HttpService:JSONEncode({
+            speed = playbackSpeed,
+            currentFolder = currentFolder,
+            lastUpdate = os.time()
+        }))
+    end)
+end
+
+local function loadConfigSettings()
+    pcall(function()
+        if not readfile or not isfile or not isfile(CONFIG_FILE) then return end
+        
+        local config = HttpService:JSONDecode(readfile(CONFIG_FILE))
+        playbackSpeed = config.speed or 1
+        currentFolder = config.currentFolder or "Default"
+    end)
+end
+
+-- ========== GUI CREATION ==========
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AutoWalkGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = game.CoreGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 320, 0, 460)
+mainFrame.Position = UDim2.new(0, 10, 0, 10)
+mainFrame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+
+local titleBar = Instance.new("Frame", mainFrame)
+titleBar.Size = UDim2.new(1, 0, 0, 35)
+titleBar.BackgroundColor3 = Color3.new(0.15, 0.15, 0.15)
+titleBar.BorderSizePixel = 0
+Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 8)
+
+local titleText = Instance.new("TextLabel", titleBar)
+titleText.Size = UDim2.new(1, -90, 1, 0)
+titleText.Position = UDim2.new(0, 8, 0, 0)
+titleText.BackgroundTransparency = 1
+titleText.Text = "WarpahVip AutoWalk v3.1"
+titleText.TextColor3 = Color3.new(1, 1, 1)
+titleText.TextSize = 14
+titleText.Font = Enum.Font.GothamBold
+titleText.TextXAlignment = Enum.TextXAlignment.Left
+
+local minimizeButton = Instance.new("TextButton", titleBar)
+minimizeButton.Size = UDim2.new(0, 25, 0, 25)
+minimizeButton.Position = UDim2.new(1, -60, 0, 5)
+minimizeButton.BackgroundColor3 = Color3.new(0.6, 0.6, 0.2)
+minimizeButton.Text = "−"
+minimizeButton.TextColor3 = Color3.new(1, 1, 1)
+minimizeButton.TextSize = 16
+minimizeButton.Font = Enum.Font.GothamBold
+minimizeButton.BorderSizePixel = 0
+Instance.new("UICorner", minimizeButton).CornerRadius = UDim.new(0, 4)
+
+local closeButton = Instance.new("TextButton", titleBar)
+closeButton.Size = UDim2.new(0, 25, 0, 25)
+closeButton.Position = UDim2.new(1, -30, 0, 5)
+closeButton.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
+closeButton.Text = "×"
+closeButton.TextColor3 = Color3.new(1, 1, 1)
+closeButton.TextSize = 16
+closeButton.Font = Enum.Font.GothamBold
+closeButton.BorderSizePixel = 0
+Instance.new("UICorner", closeButton).CornerRadius = UDim.new(0, 4)
+
+local contentFrame = Instance.new("Frame", mainFrame)
+contentFrame.Size = UDim2.new(1, 0, 1, -35)
+contentFrame.Position = UDim2.new(0, 0, 0, 35)
+contentFrame.BackgroundTransparency = 1
+
+local statusFrame = Instance.new("Frame", contentFrame)
+statusFrame.Size = UDim2.new(1, -16, 0, 30)
+statusFrame.Position = UDim2.new(0, 8, 0, 7)
+statusFrame.BackgroundColor3 = Color3.new(0.05, 0.05, 0.05)
+statusFrame.BorderSizePixel = 0
+Instance.new("UICorner", statusFrame).CornerRadius = UDim.new(0, 6)
+
+local statusText = Instance.new("TextLabel", statusFrame)
+statusText.Size = UDim2.new(1, -16, 1, 0)
+statusText.Position = UDim2.new(0, 8, 0, 0)
+statusText.BackgroundTransparency = 1
+statusText.Text = "Status: Loading..."
+statusText.TextColor3 = Color3.new(0.7, 0.9, 0.7)
+statusText.TextSize = 12
+statusText.Font = Enum.Font.Gotham
+statusText.TextXAlignment = Enum.TextXAlignment.Left
+
+local speedFrame = Instance.new("Frame", contentFrame)
+speedFrame.Size = UDim2.new(1, -16, 0, 30)
+speedFrame.Position = UDim2.new(0, 8, 0, 42)
+speedFrame.BackgroundColor3 = Color3.new(0.05, 0.05, 0.05)
+speedFrame.BorderSizePixel = 0
+Instance.new("UICorner", speedFrame).CornerRadius = UDim.new(0, 6)
+
+local speedLabel = Instance.new("TextLabel", speedFrame)
+speedLabel.Size = UDim2.new(0, 120, 1, 0)
+speedLabel.Position = UDim2.new(0, 8, 0, 0)
+speedLabel.BackgroundTransparency = 1
+speedLabel.Text = "Playback Speed:"
+speedLabel.TextColor3 = Color3.new(1, 1, 1)
+speedLabel.TextSize = 12
+speedLabel.Font = Enum.Font.Gotham
+speedLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local speedBox = Instance.new("TextBox", speedFrame)
+speedBox.Size = UDim2.new(0, 100, 0, 20)
+speedBox.Position = UDim2.new(0, 135, 0, 5)
+speedBox.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+speedBox.Text = "1.0"
+speedBox.TextColor3 = Color3.new(1, 1, 1)
+speedBox.TextSize = 11
+speedBox.Font = Enum.Font.Gotham
+speedBox.TextXAlignment = Enum.TextXAlignment.Center
+speedBox.BorderSizePixel = 0
+Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0, 4)
+
+-- Folder selector
+local folderFrame = Instance.new("Frame", contentFrame)
+folderFrame.Size = UDim2.new(1, -16, 0, 30)
+folderFrame.Position = UDim2.new(0, 8, 0, 77)
+folderFrame.BackgroundColor3 = Color3.new(0.05, 0.05, 0.05)
+folderFrame.BorderSizePixel = 0
+Instance.new("UICorner", folderFrame).CornerRadius = UDim.new(0, 6)
+
+local folderLabel = Instance.new("TextLabel", folderFrame)
+folderLabel.Size = UDim2.new(0, 50, 1, 0)
+folderLabel.Position = UDim2.new(0, 8, 0, 0)
+folderLabel.BackgroundTransparency = 1
+folderLabel.Text = "Folder:"
+folderLabel.TextColor3 = Color3.new(1, 1, 1)
+folderLabel.TextSize = 12
+folderLabel.Font = Enum.Font.Gotham
+folderLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local folderDropdown = Instance.new("TextButton", folderFrame)
+folderDropdown.Size = UDim2.new(0, 130, 0, 20)
+folderDropdown.Position = UDim2.new(0, 60, 0, 5)
+folderDropdown.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+folderDropdown.Text = "Default ▼"
+folderDropdown.TextColor3 = Color3.new(1, 1, 1)
+folderDropdown.TextSize = 11
+folderDropdown.Font = Enum.Font.Gotham
+folderDropdown.BorderSizePixel = 0
+Instance.new("UICorner", folderDropdown).CornerRadius = UDim.new(0, 4)
+
+local newFolderBtn = Instance.new("TextButton", folderFrame)
+newFolderBtn.Size = UDim2.new(0, 50, 0, 20)
+newFolderBtn.Position = UDim2.new(0, 195, 0, 5)
+newFolderBtn.BackgroundColor3 = Color3.new(0.2, 0.6, 0.8)
+newFolderBtn.Text = "+ New"
+newFolderBtn.TextColor3 = Color3.new(1, 1, 1)
+newFolderBtn.TextSize = 9
+newFolderBtn.Font = Enum.Font.GothamBold
+newFolderBtn.BorderSizePixel = 0
+Instance.new("UICorner", newFolderBtn).CornerRadius = UDim.new(0, 4)
+
+local delFolderBtn = Instance.new("TextButton", folderFrame)
+delFolderBtn.Size = UDim2.new(0, 50, 0, 20)
+delFolderBtn.Position = UDim2.new(0, 250, 0, 5)
+delFolderBtn.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
+delFolderBtn.Text = "- Del"
+delFolderBtn.TextColor3 = Color3.new(1, 1, 1)
+delFolderBtn.TextSize = 9
+delFolderBtn.Font = Enum.Font.GothamBold
+delFolderBtn.BorderSizePixel = 0
+Instance.new("UICorner", delFolderBtn).CornerRadius = UDim.new(0, 4)
+
+local function createButton(name, text, pos, color)
+    local btn = Instance.new("TextButton", contentFrame)
+    btn.Name = name
+    btn.Size = UDim2.new(0, 145, 0, 28)
+    btn.Position = pos
+    btn.BackgroundColor3 = color
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.TextSize = 12
+    btn.Font = Enum.Font.GothamSemibold
+    btn.BorderSizePixel = 0
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    return btn
+end
+
+local recButton = createButton("Rec", "Record", UDim2.new(0, 8, 0, 115), Color3.new(0.8, 0.2, 0.2))
+local stopButton = createButton("Stop", "Stop", UDim2.new(0, 163, 0, 115), Color3.new(0.6, 0.6, 0.6))
+local saveButton = createButton("Save", "Save Path", UDim2.new(0, 8, 0, 150), Color3.new(0.2, 0.6, 0.8))
+local loadButton = createButton("Load", "Refresh List", UDim2.new(0, 163, 0, 150), Color3.new(0.6, 0.2, 0.8))
+local deleteButton = createButton("Delete", "Clear Recording", UDim2.new(0, 8, 0, 185), Color3.new(0.8, 0.4, 0.2))
+local playButton = createButton("Play", "Play Recording", UDim2.new(0, 163, 0, 185), Color3.new(0.2, 0.8, 0.3))
+local pauseButton = createButton("Pause", "Pause", UDim2.new(0, 8, 0, 220), Color3.new(0.8, 0.8, 0.2))
+local playAllBtn = createButton("PlayAll", "Play All (Loop)", UDim2.new(0, 163, 0, 220), Color3.new(0.3, 0.7, 0.9))
+
+local pathListFrame = Instance.new("ScrollingFrame", contentFrame)
+pathListFrame.Size = UDim2.new(1, -16, 0, 155)
+pathListFrame.Position = UDim2.new(0, 8, 0, 258)
+pathListFrame.BackgroundColor3 = Color3.new(0.05, 0.05, 0.05)
+pathListFrame.BorderSizePixel = 0
+pathListFrame.ScrollBarThickness = 6
+Instance.new("UICorner", pathListFrame).CornerRadius = UDim.new(0, 6)
+
+local pathListLayout = Instance.new("UIListLayout", pathListFrame)
+pathListLayout.Padding = UDim.new(0, 3)
+
+-- ========== FUNCTIONS ==========
+local function updateStatus(text, color)
+    statusText.Text = "Status: " .. text
+    statusText.TextColor3 = color or Color3.new(0.7, 0.9, 0.7)
+end
+
+local function updateSpeed()
+    playbackSpeed = math.max(0.1, math.min(5, tonumber(speedBox.Text) or 1))
+    speedBox.Text = tostring(playbackSpeed)
+    saveConfigSettings()
+end
+
+-- FIXED: Recording yang benar
+local function startRecording()
+    if not recording then
+        recording = true
+        recordedPath = {}
+        lastRecordTime = tick()
+        updateStatus("Recording...", Color3.new(0.9, 0.3, 0.3))
+        
+        recordConnection = RunService.Heartbeat:Connect(function()
+            if recording and rootPart and humanoid then
+                local currentTime = tick()
+                
+                -- Record dengan interval untuk path smooth
+                if currentTime - lastRecordTime >= RECORD_INTERVAL then
+                    table.insert(recordedPath, {
+                        position = rootPart.Position,
+                        rotation = rootPart.CFrame - rootPart.Position,
+                        timestamp = currentTime
+                    })
+                    
+                    lastRecordTime = currentTime
+                    
+                    -- Update status tiap 100 points
+                    if #recordedPath % 100 == 0 then
+                        updateStatus("Recording: " .. #recordedPath .. " pts", Color3.new(0.9, 0.3, 0.3))
+                    end
+                end
+            end
+        end)
+        
+        recButton.Text = "Recording..."
+        recButton.BackgroundColor3 = Color3.new(0.9, 0.1, 0.1)
+        print("[RECORD START] Recording started")
+    end
+end
+
+local function stopRecording()
+    if recording then
+        recording = false
+        if recordConnection then
+            recordConnection:Disconnect()
+            recordConnection = nil
+        end
+        updateStatus("Stopped. " .. #recordedPath .. " points", Color3.new(0.7, 0.9, 0.7))
+        recButton.Text = "Record"
+        recButton.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
+        print("[RECORD STOP] Recorded " .. #recordedPath .. " points")
+    end
+end
+
+-- FIXED: Playback dengan animasi NATURAL (tidak robot)
+local function playPathNatural(pathData, pathName)
+    if not pathData or #pathData == 0 then
+        updateStatus("No path data!", Color3.new(0.9, 0.5, 0.2))
+        return
+    end
+    
+    playing = true
+    updateSpeed()
+    updateStatus("Playing: " .. (pathName or "recording"), Color3.new(0.3, 0.9, 0.3))
+    
+    local idx = 1
+    local startTime = tick()
+    local pathStart = pathData[1].timestamp
+    
+    -- Disable character controls selama playback
+    humanoid.AutoRotate = false
+    
+    playConnection = RunService.Heartbeat:Connect(function()
+        if not playing or not rootPart or not humanoid then
+            if playConnection then
+                playConnection:Disconnect()
+                playConnection = nil
+            end
+            playing = false
+            humanoid.WalkSpeed = 16
+            humanoid.AutoRotate = true
+            updateStatus("Stopped", Color3.new(0.7, 0.9, 0.7))
+            return
+        end
+        
+        local elapsed = (tick() - startTime) * playbackSpeed
+        local targetTime = pathStart + elapsed
+        
+        -- Find current point
+        while idx < #pathData and pathData[idx].timestamp < targetTime do
+            idx = idx + 1
+        end
+        
+        if idx <= #pathData then
+            local point = pathData[idx]
+            local nextPoint = pathData[math.min(idx + 1, #pathData)]
+            
+            if point and point.position and point.rotation then
+                -- Calculate interpolation alpha untuk smooth movement
+                local alpha = 0
+                if idx < #pathData then
+                    local timeDiff = nextPoint.timestamp - point.timestamp
+                    if timeDiff > 0 then
+                        alpha = math.clamp((targetTime - point.timestamp) / timeDiff, 0, 1)
+                    end
+                end
+                
+                -- Smooth interpolation position dan rotation
+                local targetPos = point.position:Lerp(nextPoint.position, alpha)
+                local targetRot = point.rotation:Lerp(nextPoint.rotation, alpha)
+                
+                -- Hitung velocity untuk animasi natural
+                local velocity = (nextPoint.position - point.position).Magnitude / (nextPoint.timestamp - point.timestamp + 0.001)
+                
+                -- Trigger walking animation dengan MoveTo
+                if velocity > 0.5 then
+                    humanoid:MoveTo(nextPoint.position)
+                    humanoid.WalkSpeed = math.clamp(velocity, 8, 24)
+                else
+                    humanoid.WalkSpeed = 16
+                end
+                
+                -- Set CFrame dengan smooth interpolation
+                rootPart.CFrame = CFrame.new(targetPos) * targetRot
+            end
+            
+            -- Update progress
+            if idx % 50 == 0 then
+                local pct = math.floor((idx / #pathData) * 100)
+                updateStatus("Playing " .. pct .. "%", Color3.new(0.3, 0.9, 0.3))
+            end
+        else
+            -- Completed
+            playing = false
+            humanoid.WalkSpeed = 16
+            humanoid.AutoRotate = true
+            if playConnection then
+                playConnection:Disconnect()
+                playConnection = nil
+            end
+            
+            if not playingAll then
+                updateStatus("Completed!", Color3.new(0.7, 0.9, 0.7))
+            end
+        end
+    end)
+end
+
+-- Play All Paths
+local function playAllPaths()
+    if playingAll then
+        playingAll = false
+        playing = false
+        if playConnection then
+            playConnection:Disconnect()
+            playConnection = nil
+        end
+        humanoid.AutoRotate = true
+        updateStatus("Stopped Play All", Color3.new(0.7, 0.9, 0.7))
+        playAllBtn.Text = "Play All (Loop)"
+        playAllBtn.BackgroundColor3 = Color3.new(0.3, 0.7, 0.9)
+        return
+    end
+    
+    local currentFolderPaths = folders[currentFolder]
+    if not currentFolderPaths or #currentFolderPaths == 0 then
+        updateStatus("No paths in folder!", Color3.new(0.9, 0.5, 0.2))
+        return
+    end
+    
+    playingAll = true
+    playAllBtn.Text = "Stop Play All"
+    playAllBtn.BackgroundColor3 = Color3.new(0.9, 0.3, 0.3)
+    
+    local currentPathIndex = 1
+    
+    local function playNextPath()
+        if not playingAll then return end
+        
+        if currentPathIndex > #currentFolderPaths then
+            currentPathIndex = 1 -- Loop
+        end
+        
+        local pathInfo = currentFolderPaths[currentPathIndex]
+        playPathNatural(pathInfo.data, pathInfo.name)
+        
+        -- Wait until current path finishes
+        task.spawn(function()
+            while playing and playingAll do
+                task.wait(0.1)
+            end
+            
+            if playingAll then
+                currentPathIndex = currentPathIndex + 1
+                task.wait(0.5)
+                playNextPath()
+            end
+        end)
+    end
+    
+    playNextPath()
+end
+
+-- FIXED: Update path list berdasarkan folder yang dipilih
+local function updatePathList()
+    for _, child in pairs(pathListFrame:GetChildren()) do
+        if child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+    
+    local currentFolderPaths = folders[currentFolder] or {}
+    
+    print("[UPDATE LIST] Showing " .. #currentFolderPaths .. " paths from folder: " .. currentFolder)
+    
+    for _, pathInfo in ipairs(currentFolderPaths) do
+        local pathName = pathInfo.name
+        local pathData = pathInfo.data
+        
+        local item = Instance.new("Frame", pathListFrame)
+        item.Size = UDim2.new(1, -8, 0, 28)
+        item.BackgroundColor3 = Color3.new(0.15, 0.15, 0.15)
+        item.BorderSizePixel = 0
+        Instance.new("UICorner", item).CornerRadius = UDim.new(0, 4)
+        
+        local label = Instance.new("TextLabel", item)
+        label.Size = UDim2.new(0.5, 0, 1, 0)
+        label.Position = UDim2.new(0, 6, 0, 0)
+        label.BackgroundTransparency = 1
+        label.Text = pathName .. " (" .. #pathData .. ")"
+        label.TextColor3 = Color3.new(1, 1, 1)
+        label.TextSize = 10
+        label.Font = Enum.Font.Gotham
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        
+        local playBtn = Instance.new("TextButton", item)
+        playBtn.Size = UDim2.new(0, 35, 0, 20)
+        playBtn.Position = UDim2.new(1, -75, 0, 4)
+        playBtn.BackgroundColor3 = Color3.new(0.2, 0.8, 0.3)
+        playBtn.Text = "Play"
+        playBtn.TextSize = 9
+        playBtn.Font = Enum.Font.GothamBold
+        playBtn.BorderSizePixel = 0
+        Instance.new("UICorner", playBtn).CornerRadius = UDim.new(0, 3)
+        
+        local delBtn = Instance.new("TextButton", item)
+        delBtn.Size = UDim2.new(0, 35, 0, 20)
+        delBtn.Position = UDim2.new(1, -36, 0, 4)
+        delBtn.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
+        delBtn.Text = "Del"
+        delBtn.TextSize = 9
+        delBtn.Font = Enum.Font.GothamBold
+        delBtn.BorderSizePixel = 0
+        Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0, 3)
+        
+        playBtn.MouseButton1Click:Connect(function()
+            if not playing then
+                playPathNatural(pathData, pathName)
+            end
+        end)
+        
+        delBtn.MouseButton1Click:Connect(function()
+            -- Remove from savedPaths
+            savedPaths[pathName] = nil
+            deletePathFile(pathName)
+            
+            -- Remove from current folder
+            for i, path in ipairs(currentFolderPaths) do
+                if path.name == pathName then
+                    table.remove(currentFolderPaths, i)
+                    break
+                end
+            end
+            
+            updateStatus("Deleted: " .. pathName, Color3.new(0.9, 0.5, 0.2))
+            updatePathList()
+        end)
+    end
+    
+    pathListFrame.CanvasSize = UDim2.new(0, 0, 0, pathListLayout.AbsoluteContentSize.Y)
+end
+
+-- FIXED: Save path function
+local function savePath()
+    if #recordedPath == 0 then
+        updateStatus("Nothing to save!", Color3.new(0.9, 0.5, 0.2))
+        print("[SAVE ERROR] recordedPath is empty")
+        return
+    end
+    
+    print("[SAVE] Opening save dialog, recordedPath has " .. #recordedPath .. " points")
+    
+    local inputFrame = Instance.new("Frame", screenGui)
+    inputFrame.Size = UDim2.new(0, 300, 0, 120)
+    inputFrame.Position = UDim2.new(0.5, -150, 0.5, -60)
+    inputFrame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+    inputFrame.BorderSizePixel = 0
+    Instance.new("UICorner", inputFrame).CornerRadius = UDim.new(0, 8)
+    
+    local inputLabel = Instance.new("TextLabel", inputFrame)
+    inputLabel.Size = UDim2.new(1, -16, 0, 30)
+    inputLabel.Position = UDim2.new(0, 8, 0, 8)
+    inputLabel.BackgroundTransparency = 1
+    inputLabel.Text = "Enter path name:"
+    inputLabel.TextColor3 = Color3.new(1, 1, 1)
+    inputLabel.TextSize = 14
+    inputLabel.Font = Enum.Font.GothamBold
+    inputLabel.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local nameInput = Instance.new("TextBox", inputFrame)
+    nameInput.Size = UDim2.new(1, -16, 0, 25)
+    nameInput.Position = UDim2.new(0, 8, 0, 40)
+    nameInput.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+    nameInput.Text = "Path_" .. os.date("%H%M%S")
+    nameInput.TextColor3 = Color3.new(1, 1, 1)
+    nameInput.TextSize = 12
+    nameInput.Font = Enum.Font.Gotham
+    nameInput.BorderSizePixel = 0
+    Instance.new("UICorner", nameInput).CornerRadius = UDim.new(0, 4)
+    
+    local saveBtn = Instance.new("TextButton", inputFrame)
+    saveBtn.Size = UDim2.new(0, 80, 0, 25)
+    saveBtn.Position = UDim2.new(0, 8, 0, 75)
+    saveBtn.BackgroundColor3 = Color3.new(0.2, 0.6, 0.8)
+    saveBtn.Text = "Save"
+    saveBtn.TextSize = 11
+    saveBtn.Font = Enum.Font.GothamBold
+    saveBtn.BorderSizePixel = 0
+    Instance.new("UICorner", saveBtn).CornerRadius = UDim.new(0, 4)
+    
+    local cancelBtn = Instance.new("TextButton", inputFrame)
+    cancelBtn.Size = UDim2.new(0, 80, 0, 25)
+    cancelBtn.Position = UDim2.new(1, -88, 0, 75)
+    cancelBtn.BackgroundColor3 = Color3.new(0.6, 0.6, 0.6)
+    cancelBtn.Text = "Cancel"
+    cancelBtn.TextSize = 11
+    cancelBtn.Font = Enum.Font.GothamBold
+    cancelBtn.BorderSizePixel = 0
+    Instance.new("UICorner", cancelBtn).CornerRadius = UDim.new(0, 4)
+    
+    nameInput:CaptureFocus()
+    
+    saveBtn.MouseButton1Click:Connect(function()
+        local name = nameInput.Text:gsub("^%s*(.-)%s*$", "%1"):gsub("[<>:\"/\\|%?%*]", "_")
+        if name ~= "" then
+            print("[SAVE] Saving as: " .. name .. " to folder: " .. currentFolder)
+            
+            -- Copy recordedPath (important!)
+            local pathCopy = {}
+            for i, point in ipairs(recordedPath) do
+                pathCopy[i] = {
+                    position = point.position,
+                    rotation = point.rotation,
+                    timestamp = point.timestamp
+                }
+            end
+            
+            -- Add to savedPaths
+            savedPaths[name] = {
+                data = pathCopy,
+                folder = currentFolder
+            }
+            
+            -- Add to current folder
+            if not folders[currentFolder] then
+                folders[currentFolder] = {}
+            end
+            table.insert(folders[currentFolder], {
+                name = name,
+                data = pathCopy
+            })
+            
+            -- Save to file
+            if savePathToFile(name, pathCopy, currentFolder) then
+                updateStatus("✓ Saved: " .. name, Color3.new(0.3, 0.9, 0.3))
+                print("[SAVE SUCCESS] Path saved successfully")
+            else
+                updateStatus("✗ Save failed", Color3.new(0.9, 0.3, 0.3))
+                print("[SAVE ERROR] Failed to save to file")
+            end
+            
+            updatePathList()
+            inputFrame:Destroy()
+        end
+    end)
+    
+    cancelBtn.MouseButton1Click:Connect(function()
+        inputFrame:Destroy()
+    end)
+end
+
+local function showFolderMenu()
+    local menuFrame = Instance.new("Frame", screenGui)
+    menuFrame.Size = UDim2.new(0, 250, 0, 200)
+    menuFrame.Position = UDim2.new(0.5, -125, 0.5, -100)
+    menuFrame.BackgroundColor3 = Color3.new(0.12, 0.12, 0.12)
+    menuFrame.BorderSizePixel = 0
+    Instance.new("UICorner", menuFrame).CornerRadius = UDim.new(0, 8)
+    
+    local titleLabel = Instance.new("TextLabel", menuFrame)
+    titleLabel.Size = UDim2.new(1, -16, 0, 30)
+    titleLabel.Position = UDim2.new(0, 8, 0, 8)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = "Select Folder"
+    titleLabel.TextColor3 = Color3.new(1, 1, 1)
+    titleLabel.TextSize = 14
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local folderList = Instance.new("ScrollingFrame", menuFrame)
+    folderList.Size = UDim2.new(1, -16, 0, 120)
+    folderList.Position = UDim2.new(0, 8, 0, 45)
+    folderList.BackgroundColor3 = Color3.new(0.08, 0.08, 0.08)
+    folderList.BorderSizePixel = 0
+    folderList.ScrollBarThickness = 4
+    Instance.new("UICorner", folderList).CornerRadius = UDim.new(0, 6)
+    
+    local listLayout = Instance.new("UIListLayout", folderList)
+    listLayout.Padding = UDim.new(0, 2)
+    
+    for folderName, _ in pairs(folders) do
+        local folderBtn = Instance.new("TextButton", folderList)
+        folderBtn.Size = UDim2.new(1, -8, 0, 25)
+        folderBtn.BackgroundColor3 = folderName == currentFolder and Color3.new(0.3, 0.5, 0.8) or Color3.new(0.18, 0.18, 0.18)
+        folderBtn.Text = folderName
+        folderBtn.TextColor3 = Color3.new(1, 1, 1)
+        folderBtn.TextSize = 11
+        folderBtn.Font = Enum.Font.Gotham
+        folderBtn.BorderSizePixel = 0
+        Instance.new("UICorner", folderBtn).CornerRadius = UDim.new(0, 4)
+        
+        folderBtn.MouseButton1Click:Connect(function()
+            currentFolder = folderName
+            folderDropdown.Text = currentFolder .. " ▼"
+            saveConfigSettings()
+            updatePathList()
+            updateStatus("Switched to: " .. folderName, Color3.new(0.3, 0.9, 0.3))
+            menuFrame:Destroy()
+        end)
+    end
+    
+    folderList.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
+    
+    local closeBtn = Instance.new("TextButton", menuFrame)
+    closeBtn.Size = UDim2.new(0, 100, 0, 25)
+    closeBtn.Position = UDim2.new(0.5, -50, 1, -35)
+    closeBtn.BackgroundColor3 = Color3.new(0.6, 0.6, 0.6)
+    closeBtn.Text = "Close"
+    closeBtn.TextSize = 11
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.BorderSizePixel = 0
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
+    
+    closeBtn.MouseButton1Click:Connect(function()
+        menuFrame:Destroy()
+    end)
+end
+
+local function createNewFolder()
+    local inputFrame = Instance.new("Frame", screenGui)
+    inputFrame.Size = UDim2.new(0, 280, 0, 120)
+    inputFrame.Position = UDim2.new(0.5, -140, 0.5, -60)
+    inputFrame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+    inputFrame.BorderSizePixel = 0
+    Instance.new("UICorner", inputFrame).CornerRadius = UDim.new(0, 8)
+    
+    local inputLabel = Instance.new("TextLabel", inputFrame)
+    inputLabel.Size = UDim2.new(1, -16, 0, 30)
+    inputLabel.Position = UDim2.new(0, 8, 0, 8)
+    inputLabel.BackgroundTransparency = 1
+    inputLabel.Text = "Enter folder name:"
+    inputLabel.TextColor3 = Color3.new(1, 1, 1)
+    inputLabel.TextSize = 14
+    inputLabel.Font = Enum.Font.GothamBold
+    inputLabel.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local nameInput = Instance.new("TextBox", inputFrame)
+    nameInput.Size = UDim2.new(1, -16, 0, 25)
+    nameInput.Position = UDim2.new(0, 8, 0, 40)
+    nameInput.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+    nameInput.Text = "NewFolder"
+    nameInput.TextColor3 = Color3.new(1, 1, 1)
+    nameInput.TextSize = 12
+    nameInput.Font = Enum.Font.Gotham
+    nameInput.BorderSizePixel = 0
+    Instance.new("UICorner", nameInput).CornerRadius = UDim.new(0, 4)
+    
+    local createBtn = Instance.new("TextButton", inputFrame)
+    createBtn.Size = UDim2.new(0, 80, 0, 25)
+    createBtn.Position = UDim2.new(0, 8, 0, 75)
+    createBtn.BackgroundColor3 = Color3.new(0.2, 0.6, 0.8)
+    createBtn.Text = "Create"
+    createBtn.TextSize = 11
+    createBtn.Font = Enum.Font.GothamBold
+    createBtn.BorderSizePixel = 0
+    Instance.new("UICorner", createBtn).CornerRadius = UDim.new(0, 4)
+    
+    local cancelBtn = Instance.new("TextButton", inputFrame)
+    cancelBtn.Size = UDim2.new(0, 80, 0, 25)
+    cancelBtn.Position = UDim2.new(1, -88, 0, 75)
+    cancelBtn.BackgroundColor3 = Color3.new(0.6, 0.6, 0.6)
+    cancelBtn.Text = "Cancel"
+    cancelBtn.TextSize = 11
+    cancelBtn.Font = Enum.Font.GothamBold
+    cancelBtn.BorderSizePixel = 0
+    Instance.new("UICorner", cancelBtn).CornerRadius = UDim.new(0, 4)
+    
+    nameInput:CaptureFocus()
+    
+    createBtn.MouseButton1Click:Connect(function()
+        local name = nameInput.Text:gsub("^%s*(.-)%s*$", "%1"):gsub("[<>:\"/\\|%?%*]", "_")
+        if name ~= "" and not folders[name] then
+            folders[name] = {}
+            currentFolder = name
+            folderDropdown.Text = currentFolder .. " ▼"
+            saveConfigSettings()
+            updateStatus("✓ Created folder: " .. name, Color3.new(0.3, 0.9, 0.3))
+            updatePathList()
+            inputFrame:Destroy()
+        elseif folders[name] then
+            updateStatus("Folder already exists!", Color3.new(0.9, 0.5, 0.2))
+        end
+    end)
+    
+    cancelBtn.MouseButton1Click:Connect(function()
+        inputFrame:Destroy()
+    end)
+end
+
+-- ADDED: Delete folder function
+local function deleteFolder()
+    if currentFolder == "Default" then
+        updateStatus("Cannot delete Default folder!", Color3.new(0.9, 0.5, 0.2))
+        return
+    end
+    
+    local confirmFrame = Instance.new("Frame", screenGui)
+    confirmFrame.Size = UDim2.new(0, 300, 0, 150)
+    confirmFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+    confirmFrame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+    confirmFrame.BorderSizePixel = 0
+    Instance.new("UICorner", confirmFrame).CornerRadius = UDim.new(0, 8)
+    
+    local titleLabel = Instance.new("TextLabel", confirmFrame)
+    titleLabel.Size = UDim2.new(1, -16, 0, 30)
+    titleLabel.Position = UDim2.new(0, 8, 0, 8)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = "Delete Folder?"
+    titleLabel.TextColor3 = Color3.new(1, 1, 1)
+    titleLabel.TextSize = 16
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Center
+    
+    local warningLabel = Instance.new("TextLabel", confirmFrame)
+    warningLabel.Size = UDim2.new(1, -16, 0, 50)
+    warningLabel.Position = UDim2.new(0, 8, 0, 45)
+    warningLabel.BackgroundTransparency = 1
+    warningLabel.Text = "Delete folder '" .. currentFolder .. "'?\nAll paths inside will be deleted!"
+    warningLabel.TextColor3 = Color3.new(1, 0.8, 0.2)
+    warningLabel.TextSize = 12
+    warningLabel.Font = Enum.Font.Gotham
+    warningLabel.TextWrapped = true
+    
+    local yesBtn = Instance.new("TextButton", confirmFrame)
+    yesBtn.Size = UDim2.new(0, 120, 0, 30)
+    yesBtn.Position = UDim2.new(0, 15, 0, 105)
+    yesBtn.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
+    yesBtn.Text = "Yes, Delete"
+    yesBtn.TextSize = 12
+    yesBtn.Font = Enum.Font.GothamBold
+    yesBtn.TextColor3 = Color3.new(1, 1, 1)
+    yesBtn.BorderSizePixel = 0
+    Instance.new("UICorner", yesBtn).CornerRadius = UDim.new(0, 6)
+    
+    local noBtn = Instance.new("TextButton", confirmFrame)
+    noBtn.Size = UDim2.new(0, 120, 0, 30)
+    noBtn.Position = UDim2.new(1, -135, 0, 105)
+    noBtn.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+    noBtn.Text = "Cancel"
+    noBtn.TextSize = 12
+    noBtn.Font = Enum.Font.GothamBold
+    noBtn.TextColor3 = Color3.new(1, 1, 1)
+    noBtn.BorderSizePixel = 0
+    Instance.new("UICorner", noBtn).CornerRadius = UDim.new(0, 6)
+    
+    yesBtn.MouseButton1Click:Connect(function()
+        -- Delete all paths in folder
+        local pathsToDelete = folders[currentFolder] or {}
+        for _, pathInfo in ipairs(pathsToDelete) do
+            deletePathFile(pathInfo.name)
+            savedPaths[pathInfo.name] = nil
+        end
+        
+        -- Delete folder
+        folders[currentFolder] = nil
+        
+        -- Switch to Default
+        currentFolder = "Default"
+        folderDropdown.Text = currentFolder .. " ▼"
+        saveConfigSettings()
+        updatePathList()
+        updateStatus("Deleted folder!", Color3.new(0.9, 0.5, 0.2))
+        confirmFrame:Destroy()
+    end)
+    
+    noBtn.MouseButton1Click:Connect(function()
+        confirmFrame:Destroy()
+    end)
+end
+
+local function stopPlayback()
+    if playing then
+        playing = false
+        playingAll = false
+        if playConnection then
+            playConnection:Disconnect()
+            playConnection = nil
+        end
+        if humanoid then
+            humanoid.WalkSpeed = 16
+            humanoid.AutoRotate = true
+        end
+        updateStatus("Playback stopped", Color3.new(0.7, 0.9, 0.7))
+        playAllBtn.Text = "Play All (Loop)"
+        playAllBtn.BackgroundColor3 = Color3.new(0.3, 0.7, 0.9)
+    end
+end
+
+local isMinimized = false
+local function toggleMinimize()
+    isMinimized = not isMinimized
+    local targetSize = isMinimized and UDim2.new(0, 320, 0, 35) or UDim2.new(0, 320, 0, 460)
+    TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = targetSize}):Play()
+    contentFrame.Visible = not isMinimized
+    minimizeButton.Text = isMinimized and "+" or "−"
+end
+
+-- ========== BUTTON CONNECTIONS ==========
+minimizeButton.MouseButton1Click:Connect(toggleMinimize)
+speedBox.FocusLost:Connect(updateSpeed)
+
+folderDropdown.MouseButton1Click:Connect(showFolderMenu)
+newFolderBtn.MouseButton1Click:Connect(createNewFolder)
+delFolderBtn.MouseButton1Click:Connect(deleteFolder)
+
+recButton.MouseButton1Click:Connect(startRecording)
+
+stopButton.MouseButton1Click:Connect(function()
+    stopRecording()
+    stopPlayback()
+end)
+
+saveButton.MouseButton1Click:Connect(savePath)
+
+loadButton.MouseButton1Click:Connect(function()
+    local loadedCount = autoLoadAllPaths()
+    updatePathList()
+    updateStatus("Refreshed! " .. loadedCount .. " path(s)", Color3.new(0.3, 0.9, 0.3))
+end)
+
+deleteButton.MouseButton1Click:Connect(function()
+    local oldCount = #recordedPath
+    recordedPath = {}
+    updateStatus("Cleared " .. oldCount .. " points", Color3.new(0.9, 0.5, 0.2))
+end)
+
+playButton.MouseButton1Click:Connect(function()
+    if #recordedPath > 0 then
+        if not playing then
+            playPathNatural(recordedPath, "current recording")
+        end
+    else
+        updateStatus("Record or load path first", Color3.new(0.9, 0.5, 0.2))
+    end
+end)
+
+pauseButton.MouseButton1Click:Connect(stopPlayback)
+playAllBtn.MouseButton1Click:Connect(playAllPaths)
+
+closeButton.MouseButton1Click:Connect(function()
+    if recordConnection then recordConnection:Disconnect() end
+    if playConnection then playConnection:Disconnect() end
+    screenGui:Destroy()
+end)
+
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoid = character:WaitForChild("Humanoid")
+    rootPart = character:WaitForChild("HumanoidRootPart")
+end)
+
+-- ========== INITIALIZE ==========
+print("\n" .. string.rep("=", 60))
+print("  WarpahVip AutoWalk v3.1 - ALL FIXED")
+print(string.rep("=", 60))
+
+loadConfigSettings()
+speedBox.Text = tostring(playbackSpeed)
+
+local loadedCount = autoLoadAllPaths()
+folderDropdown.Text = currentFolder .. " ▼"
+updatePathList()
+
+if loadedCount > 0 then
+    updateStatus("Loaded " .. loadedCount .. " saved path(s)!", Color3.new(0.3, 0.9, 0.3))
+else
+    updateStatus("Ready to record!", Color3.new(0.7, 0.9, 0.7))
+end
+
+print("\n✓ Script ready to use!")
+print("✓ SAVE FIXED - Can save after recording")
+print("✓ DELETE FOLDER added")
+print("✓ FOLDER LOGIC FIXED - Shows correct paths per folder")
+print("✓ ANIMATION FIXED - Natural smooth movement with velocity")
+print("✓ Auto-saves to: workspace/" .. FOLDER_NAME)
+print(string.rep("=", 60) .. "\n")
