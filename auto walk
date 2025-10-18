@@ -1,5 +1,5 @@
--- Auto Walk Script v3.1 - ALL BUGS FIXED
--- Save fixed, Delete folder, Proper folder logic, Natural animations
+-- Auto Walk Script v3.3 - COMPLETE REWRITE
+-- Fixed: All core logic rewritten for perfect synchronization
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -11,6 +11,7 @@ local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
+-- State variables
 local recording = false
 local playing = false
 local playingAll = false
@@ -20,10 +21,10 @@ local folders = {}
 local currentFolder = "Default"
 local playConnection = nil
 local recordConnection = nil
+local playAllConnection = nil
 local playbackSpeed = 1
 
--- Optimasi untuk recording panjang
-local RECORD_INTERVAL = 0.05 -- Record lebih sering untuk smooth
+local RECORD_INTERVAL = 0.05
 local lastRecordTime = 0
 
 -- ========== FILE SYSTEM ==========
@@ -73,7 +74,7 @@ local function savePathToFile(pathName, pathData, folderName)
             savedAt = os.time()
         }))
         
-        print("[SAVED] " .. pathName .. " (" .. #serializableData .. " points) to folder: " .. (folderName or "Default"))
+        print("[SAVED] " .. pathName .. " (" .. #serializableData .. " points)")
     end)
     
     return success
@@ -84,18 +85,12 @@ local function loadPathFromFile(fileName)
         if not readfile or not isfile then return nil end
         
         local fullPath = FOLDER_NAME .. "/" .. fileName
-        if not isfile(fullPath) then 
-            warn("File not found: " .. fullPath)
-            return nil 
-        end
+        if not isfile(fullPath) then return nil end
         
         local fileContent = readfile(fullPath)
         local fileData = HttpService:JSONDecode(fileContent)
         
-        if not fileData or not fileData.points then 
-            warn("Invalid file format: " .. fileName)
-            return nil 
-        end
+        if not fileData or not fileData.points then return nil end
         
         local loadedPath = {}
         for i, point in ipairs(fileData.points) do
@@ -109,7 +104,7 @@ local function loadPathFromFile(fileName)
             }
         end
         
-        print("[LOADED] " .. fileData.name .. " (" .. #loadedPath .. " points) from folder: " .. (fileData.folder or "Default"))
+        print("[LOADED] " .. fileData.name .. " (" .. #loadedPath .. " points)")
         return {
             name = fileData.name, 
             data = loadedPath,
@@ -120,7 +115,6 @@ local function loadPathFromFile(fileName)
     if success and result then
         return result
     else
-        warn("Failed to load: " .. fileName .. " - " .. tostring(result))
         return nil
     end
 end
@@ -146,17 +140,15 @@ local function getAllSavedFiles()
 end
 
 local function deletePathFile(pathName)
-    local success = pcall(function()
+    pcall(function()
         if delfile and isfile then
             local path = FOLDER_NAME .. "/" .. pathName .. ".json"
             if isfile(path) then
                 delfile(path)
                 print("[DELETED] " .. pathName)
-                return true
             end
         end
     end)
-    return success
 end
 
 local function autoLoadAllPaths()
@@ -165,19 +157,15 @@ local function autoLoadAllPaths()
     folders = {}
     savedPaths = {}
     
-    print("\n=== AUTO-LOADING SAVED PATHS ===")
-    
     for _, fileName in pairs(files) do
         local pathData = loadPathFromFile(fileName)
         if pathData and pathData.data then
             local folderName = pathData.folder or "Default"
             
-            -- Create folder if not exists
             if not folders[folderName] then
                 folders[folderName] = {}
             end
             
-            -- Add to folder
             table.insert(folders[folderName], {
                 name = pathData.name,
                 data = pathData.data
@@ -191,17 +179,9 @@ local function autoLoadAllPaths()
         end
     end
     
-    -- Ensure Default folder exists
     if not folders["Default"] then
         folders["Default"] = {}
     end
-    
-    if loadedCount > 0 then
-        print("[SUCCESS] Loaded " .. loadedCount .. " saved path(s)")
-    else
-        print("[INFO] No saved paths found")
-    end
-    print("================================\n")
     
     return loadedCount
 end
@@ -256,7 +236,7 @@ local titleText = Instance.new("TextLabel", titleBar)
 titleText.Size = UDim2.new(1, -90, 1, 0)
 titleText.Position = UDim2.new(0, 8, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "WarpahVip AutoWalk v3.1"
+titleText.Text = "WarpahVip AutoWalk v3.3"
 titleText.TextColor3 = Color3.new(1, 1, 1)
 titleText.TextSize = 14
 titleText.Font = Enum.Font.GothamBold
@@ -335,7 +315,6 @@ speedBox.TextXAlignment = Enum.TextXAlignment.Center
 speedBox.BorderSizePixel = 0
 Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0, 4)
 
--- Folder selector
 local folderFrame = Instance.new("Frame", contentFrame)
 folderFrame.Size = UDim2.new(1, -16, 0, 30)
 folderFrame.Position = UDim2.new(0, 8, 0, 77)
@@ -421,7 +400,7 @@ Instance.new("UICorner", pathListFrame).CornerRadius = UDim.new(0, 6)
 local pathListLayout = Instance.new("UIListLayout", pathListFrame)
 pathListLayout.Padding = UDim.new(0, 3)
 
--- ========== FUNCTIONS ==========
+-- ========== CORE FUNCTIONS - REWRITTEN ==========
 local function updateStatus(text, color)
     statusText.Text = "Status: " .. text
     statusText.TextColor3 = color or Color3.new(0.7, 0.9, 0.7)
@@ -433,40 +412,87 @@ local function updateSpeed()
     saveConfigSettings()
 end
 
--- FIXED: Recording yang benar
-local function startRecording()
-    if not recording then
-        recording = true
-        recordedPath = {}
-        lastRecordTime = tick()
-        updateStatus("Recording...", Color3.new(0.9, 0.3, 0.3))
-        
-        recordConnection = RunService.Heartbeat:Connect(function()
-            if recording and rootPart and humanoid then
-                local currentTime = tick()
-                
-                -- Record dengan interval untuk path smooth
-                if currentTime - lastRecordTime >= RECORD_INTERVAL then
-                    table.insert(recordedPath, {
-                        position = rootPart.Position,
-                        rotation = rootPart.CFrame - rootPart.Position,
-                        timestamp = currentTime
-                    })
-                    
-                    lastRecordTime = currentTime
-                    
-                    -- Update status tiap 100 points
-                    if #recordedPath % 100 == 0 then
-                        updateStatus("Recording: " .. #recordedPath .. " pts", Color3.new(0.9, 0.3, 0.3))
-                    end
-                end
-            end
-        end)
-        
-        recButton.Text = "Recording..."
-        recButton.BackgroundColor3 = Color3.new(0.9, 0.1, 0.1)
-        print("[RECORD START] Recording started")
+-- CLEAN STOP FUNCTION - stops everything
+local function stopEverything()
+    print("[STOP] Stopping all activities")
+    
+    -- Stop recording
+    if recording then
+        recording = false
+        if recordConnection then
+            recordConnection:Disconnect()
+            recordConnection = nil
+        end
+        recButton.Text = "Record"
+        recButton.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
     end
+    
+    -- Stop playing
+    if playing then
+        playing = false
+        if playConnection then
+            playConnection:Disconnect()
+            playConnection = nil
+        end
+    end
+    
+    -- Stop play all
+    if playingAll then
+        playingAll = false
+        if playAllConnection then
+            playAllConnection:Disconnect()
+            playAllConnection = nil
+        end
+        playAllBtn.Text = "Play All (Loop)"
+        playAllBtn.BackgroundColor3 = Color3.new(0.3, 0.7, 0.9)
+    end
+    
+    -- Reset humanoid
+    if humanoid then
+        humanoid.WalkSpeed = 16
+        humanoid.AutoRotate = true
+    end
+    
+    updateStatus("Stopped", Color3.new(0.7, 0.9, 0.7))
+end
+
+-- RECORDING - Simple and reliable
+local function startRecording()
+    stopEverything()
+    
+    recording = true
+    recordedPath = {}
+    lastRecordTime = tick()
+    
+    recButton.Text = "Recording..."
+    recButton.BackgroundColor3 = Color3.new(0.9, 0.1, 0.1)
+    updateStatus("Recording...", Color3.new(0.9, 0.3, 0.3))
+    
+    print("[RECORD] Started")
+    
+    recordConnection = RunService.Heartbeat:Connect(function()
+        if not recording or not rootPart then 
+            if recordConnection then
+                recordConnection:Disconnect()
+                recordConnection = nil
+            end
+            return 
+        end
+        
+        local currentTime = tick()
+        if currentTime - lastRecordTime >= RECORD_INTERVAL then
+            table.insert(recordedPath, {
+                position = rootPart.Position,
+                rotation = rootPart.CFrame - rootPart.Position,
+                timestamp = currentTime
+            })
+            lastRecordTime = currentTime
+            
+            if #recordedPath % 100 == 0 then
+                updateStatus("Recording: " .. #recordedPath .. " pts", Color3.new(0.9, 0.3, 0.3))
+            end
+        end
+    end)
 end
 
 local function stopRecording()
@@ -476,29 +502,32 @@ local function stopRecording()
             recordConnection:Disconnect()
             recordConnection = nil
         end
-        updateStatus("Stopped. " .. #recordedPath .. " points", Color3.new(0.7, 0.9, 0.7))
         recButton.Text = "Record"
         recButton.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
-        print("[RECORD STOP] Recorded " .. #recordedPath .. " points")
+        updateStatus("Stopped. " .. #recordedPath .. " points", Color3.new(0.7, 0.9, 0.7))
+        print("[RECORD] Stopped - " .. #recordedPath .. " points")
     end
 end
 
--- FIXED: Playback dengan animasi NATURAL (tidak robot)
-local function playPathNatural(pathData, pathName)
+-- PLAYBACK - Single path with completion callback
+local function playSinglePath(pathData, pathName, onComplete)
     if not pathData or #pathData == 0 then
-        updateStatus("No path data!", Color3.new(0.9, 0.5, 0.2))
+        print("[PLAY] No path data")
+        if onComplete then onComplete() end
         return
     end
+    
+    print("[PLAY] Starting: " .. (pathName or "recording") .. " - " .. #pathData .. " points")
     
     playing = true
     updateSpeed()
     updateStatus("Playing: " .. (pathName or "recording"), Color3.new(0.3, 0.9, 0.3))
     
-    local idx = 1
     local startTime = tick()
     local pathStart = pathData[1].timestamp
+    local pathEnd = pathData[#pathData].timestamp
+    local pathDuration = pathEnd - pathStart
     
-    -- Disable character controls selama playback
     humanoid.AutoRotate = false
     
     playConnection = RunService.Heartbeat:Connect(function()
@@ -510,58 +539,26 @@ local function playPathNatural(pathData, pathName)
             playing = false
             humanoid.WalkSpeed = 16
             humanoid.AutoRotate = true
-            updateStatus("Stopped", Color3.new(0.7, 0.9, 0.7))
+            print("[PLAY] Interrupted")
+            if onComplete then onComplete() end
             return
         end
         
         local elapsed = (tick() - startTime) * playbackSpeed
-        local targetTime = pathStart + elapsed
+        local currentTime = pathStart + elapsed
         
-        -- Find current point
-        while idx < #pathData and pathData[idx].timestamp < targetTime do
-            idx = idx + 1
+        -- Find current waypoint
+        local currentIndex = 1
+        for i = 1, #pathData do
+            if pathData[i].timestamp <= currentTime then
+                currentIndex = i
+            else
+                break
+            end
         end
         
-        if idx <= #pathData then
-            local point = pathData[idx]
-            local nextPoint = pathData[math.min(idx + 1, #pathData)]
-            
-            if point and point.position and point.rotation then
-                -- Calculate interpolation alpha untuk smooth movement
-                local alpha = 0
-                if idx < #pathData then
-                    local timeDiff = nextPoint.timestamp - point.timestamp
-                    if timeDiff > 0 then
-                        alpha = math.clamp((targetTime - point.timestamp) / timeDiff, 0, 1)
-                    end
-                end
-                
-                -- Smooth interpolation position dan rotation
-                local targetPos = point.position:Lerp(nextPoint.position, alpha)
-                local targetRot = point.rotation:Lerp(nextPoint.rotation, alpha)
-                
-                -- Hitung velocity untuk animasi natural
-                local velocity = (nextPoint.position - point.position).Magnitude / (nextPoint.timestamp - point.timestamp + 0.001)
-                
-                -- Trigger walking animation dengan MoveTo
-                if velocity > 0.5 then
-                    humanoid:MoveTo(nextPoint.position)
-                    humanoid.WalkSpeed = math.clamp(velocity, 8, 24)
-                else
-                    humanoid.WalkSpeed = 16
-                end
-                
-                -- Set CFrame dengan smooth interpolation
-                rootPart.CFrame = CFrame.new(targetPos) * targetRot
-            end
-            
-            -- Update progress
-            if idx % 50 == 0 then
-                local pct = math.floor((idx / #pathData) * 100)
-                updateStatus("Playing " .. pct .. "%", Color3.new(0.3, 0.9, 0.3))
-            end
-        else
-            -- Completed
+        if currentIndex >= #pathData then
+            -- PATH COMPLETED
             playing = false
             humanoid.WalkSpeed = 16
             humanoid.AutoRotate = true
@@ -570,26 +567,53 @@ local function playPathNatural(pathData, pathName)
                 playConnection = nil
             end
             
-            if not playingAll then
-                updateStatus("Completed!", Color3.new(0.7, 0.9, 0.7))
+            print("[PLAY] Completed: " .. (pathName or "recording"))
+            updateStatus("Completed!", Color3.new(0.7, 0.9, 0.7))
+            
+            if onComplete then 
+                task.wait(0.1)
+                onComplete() 
             end
+            return
+        end
+        
+        -- Interpolate between current and next point
+        local point = pathData[currentIndex]
+        local nextPoint = pathData[math.min(currentIndex + 1, #pathData)]
+        
+        local timeDiff = nextPoint.timestamp - point.timestamp
+        local alpha = 0
+        if timeDiff > 0 then
+            alpha = math.clamp((currentTime - point.timestamp) / timeDiff, 0, 1)
+        end
+        
+        local targetPos = point.position:Lerp(nextPoint.position, alpha)
+        local targetRot = point.rotation:Lerp(nextPoint.rotation, alpha)
+        
+        -- Calculate velocity for animation
+        local velocity = (nextPoint.position - point.position).Magnitude / (timeDiff + 0.001)
+        
+        if velocity > 0.5 then
+            humanoid:MoveTo(nextPoint.position)
+            humanoid.WalkSpeed = math.clamp(velocity, 8, 24)
+        else
+            humanoid.WalkSpeed = 16
+        end
+        
+        rootPart.CFrame = CFrame.new(targetPos) * targetRot
+        
+        -- Update progress
+        local progress = math.floor((currentIndex / #pathData) * 100)
+        if currentIndex % 50 == 0 then
+            updateStatus("Playing " .. progress .. "%", Color3.new(0.3, 0.9, 0.3))
         end
     end)
 end
 
--- Play All Paths
+-- PLAY ALL - Sequential playback with proper synchronization
 local function playAllPaths()
     if playingAll then
-        playingAll = false
-        playing = false
-        if playConnection then
-            playConnection:Disconnect()
-            playConnection = nil
-        end
-        humanoid.AutoRotate = true
-        updateStatus("Stopped Play All", Color3.new(0.7, 0.9, 0.7))
-        playAllBtn.Text = "Play All (Loop)"
-        playAllBtn.BackgroundColor3 = Color3.new(0.3, 0.7, 0.9)
+        stopEverything()
         return
     end
     
@@ -599,40 +623,47 @@ local function playAllPaths()
         return
     end
     
+    stopEverything()
     playingAll = true
     playAllBtn.Text = "Stop Play All"
     playAllBtn.BackgroundColor3 = Color3.new(0.9, 0.3, 0.3)
     
+    print("[PLAY ALL] Started - " .. #currentFolderPaths .. " paths")
+    
     local currentPathIndex = 1
     
-    local function playNextPath()
-        if not playingAll then return end
+    local function playNext()
+        if not playingAll then 
+            print("[PLAY ALL] Stopped")
+            return 
+        end
         
+        -- Loop back to start
         if currentPathIndex > #currentFolderPaths then
-            currentPathIndex = 1 -- Loop
+            currentPathIndex = 1
+            print("[PLAY ALL] Looping back to start")
         end
         
         local pathInfo = currentFolderPaths[currentPathIndex]
-        playPathNatural(pathInfo.data, pathInfo.name)
+        updateStatus("Playing " .. currentPathIndex .. "/" .. #currentFolderPaths .. ": " .. pathInfo.name, Color3.new(0.3, 0.9, 0.3))
+        print("[PLAY ALL] Path " .. currentPathIndex .. "/" .. #currentFolderPaths .. ": " .. pathInfo.name)
         
-        -- Wait until current path finishes
-        task.spawn(function()
-            while playing and playingAll do
-                task.wait(0.1)
-            end
+        playSinglePath(pathInfo.data, pathInfo.name, function()
+            if not playingAll then return end
             
-            if playingAll then
-                currentPathIndex = currentPathIndex + 1
-                task.wait(0.5)
-                playNextPath()
-            end
+            print("[PLAY ALL] Path completed, waiting 0.5s...")
+            task.wait(0.5)
+            
+            if not playingAll then return end
+            
+            currentPathIndex = currentPathIndex + 1
+            playNext()
         end)
     end
     
-    playNextPath()
+    playNext()
 end
 
--- FIXED: Update path list berdasarkan folder yang dipilih
 local function updatePathList()
     for _, child in pairs(pathListFrame:GetChildren()) do
         if child:IsA("Frame") then
@@ -641,8 +672,6 @@ local function updatePathList()
     end
     
     local currentFolderPaths = folders[currentFolder] or {}
-    
-    print("[UPDATE LIST] Showing " .. #currentFolderPaths .. " paths from folder: " .. currentFolder)
     
     for _, pathInfo in ipairs(currentFolderPaths) do
         local pathName = pathInfo.name
@@ -685,17 +714,16 @@ local function updatePathList()
         Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0, 3)
         
         playBtn.MouseButton1Click:Connect(function()
-            if not playing then
-                playPathNatural(pathData, pathName)
+            if not playing and not playingAll then
+                stopEverything()
+                playSinglePath(pathData, pathName, nil)
             end
         end)
         
         delBtn.MouseButton1Click:Connect(function()
-            -- Remove from savedPaths
             savedPaths[pathName] = nil
             deletePathFile(pathName)
             
-            -- Remove from current folder
             for i, path in ipairs(currentFolderPaths) do
                 if path.name == pathName then
                     table.remove(currentFolderPaths, i)
@@ -711,15 +739,11 @@ local function updatePathList()
     pathListFrame.CanvasSize = UDim2.new(0, 0, 0, pathListLayout.AbsoluteContentSize.Y)
 end
 
--- FIXED: Save path function
 local function savePath()
     if #recordedPath == 0 then
         updateStatus("Nothing to save!", Color3.new(0.9, 0.5, 0.2))
-        print("[SAVE ERROR] recordedPath is empty")
         return
     end
-    
-    print("[SAVE] Opening save dialog, recordedPath has " .. #recordedPath .. " points")
     
     local inputFrame = Instance.new("Frame", screenGui)
     inputFrame.Size = UDim2.new(0, 300, 0, 120)
@@ -774,9 +798,6 @@ local function savePath()
     saveBtn.MouseButton1Click:Connect(function()
         local name = nameInput.Text:gsub("^%s*(.-)%s*$", "%1"):gsub("[<>:\"/\\|%?%*]", "_")
         if name ~= "" then
-            print("[SAVE] Saving as: " .. name .. " to folder: " .. currentFolder)
-            
-            -- Copy recordedPath (important!)
             local pathCopy = {}
             for i, point in ipairs(recordedPath) do
                 pathCopy[i] = {
@@ -786,13 +807,11 @@ local function savePath()
                 }
             end
             
-            -- Add to savedPaths
             savedPaths[name] = {
                 data = pathCopy,
                 folder = currentFolder
             }
             
-            -- Add to current folder
             if not folders[currentFolder] then
                 folders[currentFolder] = {}
             end
@@ -801,13 +820,10 @@ local function savePath()
                 data = pathCopy
             })
             
-            -- Save to file
             if savePathToFile(name, pathCopy, currentFolder) then
                 updateStatus("✓ Saved: " .. name, Color3.new(0.3, 0.9, 0.3))
-                print("[SAVE SUCCESS] Path saved successfully")
             else
                 updateStatus("✗ Save failed", Color3.new(0.9, 0.3, 0.3))
-                print("[SAVE ERROR] Failed to save to file")
             end
             
             updatePathList()
@@ -958,7 +974,6 @@ local function createNewFolder()
     end)
 end
 
--- ADDED: Delete folder function
 local function deleteFolder()
     if currentFolder == "Default" then
         updateStatus("Cannot delete Default folder!", Color3.new(0.9, 0.5, 0.2))
@@ -1015,17 +1030,13 @@ local function deleteFolder()
     Instance.new("UICorner", noBtn).CornerRadius = UDim.new(0, 6)
     
     yesBtn.MouseButton1Click:Connect(function()
-        -- Delete all paths in folder
         local pathsToDelete = folders[currentFolder] or {}
         for _, pathInfo in ipairs(pathsToDelete) do
             deletePathFile(pathInfo.name)
             savedPaths[pathInfo.name] = nil
         end
         
-        -- Delete folder
         folders[currentFolder] = nil
-        
-        -- Switch to Default
         currentFolder = "Default"
         folderDropdown.Text = currentFolder .. " ▼"
         saveConfigSettings()
@@ -1037,24 +1048,6 @@ local function deleteFolder()
     noBtn.MouseButton1Click:Connect(function()
         confirmFrame:Destroy()
     end)
-end
-
-local function stopPlayback()
-    if playing then
-        playing = false
-        playingAll = false
-        if playConnection then
-            playConnection:Disconnect()
-            playConnection = nil
-        end
-        if humanoid then
-            humanoid.WalkSpeed = 16
-            humanoid.AutoRotate = true
-        end
-        updateStatus("Playback stopped", Color3.new(0.7, 0.9, 0.7))
-        playAllBtn.Text = "Play All (Loop)"
-        playAllBtn.BackgroundColor3 = Color3.new(0.3, 0.7, 0.9)
-    end
 end
 
 local isMinimized = false
@@ -1077,8 +1070,11 @@ delFolderBtn.MouseButton1Click:Connect(deleteFolder)
 recButton.MouseButton1Click:Connect(startRecording)
 
 stopButton.MouseButton1Click:Connect(function()
-    stopRecording()
-    stopPlayback()
+    if recording then
+        stopRecording()
+    else
+        stopEverything()
+    end
 end)
 
 saveButton.MouseButton1Click:Connect(savePath)
@@ -1097,20 +1093,20 @@ end)
 
 playButton.MouseButton1Click:Connect(function()
     if #recordedPath > 0 then
-        if not playing then
-            playPathNatural(recordedPath, "current recording")
+        if not playing and not playingAll then
+            stopEverything()
+            playSinglePath(recordedPath, "current recording", nil)
         end
     else
         updateStatus("Record or load path first", Color3.new(0.9, 0.5, 0.2))
     end
 end)
 
-pauseButton.MouseButton1Click:Connect(stopPlayback)
+pauseButton.MouseButton1Click:Connect(stopEverything)
 playAllBtn.MouseButton1Click:Connect(playAllPaths)
 
 closeButton.MouseButton1Click:Connect(function()
-    if recordConnection then recordConnection:Disconnect() end
-    if playConnection then playConnection:Disconnect() end
+    stopEverything()
     screenGui:Destroy()
 end)
 
@@ -1122,7 +1118,7 @@ end)
 
 -- ========== INITIALIZE ==========
 print("\n" .. string.rep("=", 60))
-print("  WarpahVip AutoWalk v3.1 - ALL FIXED")
+print("  WarpahVip AutoWalk v3.3 - COMPLETE REWRITE")
 print(string.rep("=", 60))
 
 loadConfigSettings()
@@ -1138,10 +1134,10 @@ else
     updateStatus("Ready to record!", Color3.new(0.7, 0.9, 0.7))
 end
 
-print("\n✓ Script ready to use!")
-print("✓ SAVE FIXED - Can save after recording")
-print("✓ DELETE FOLDER added")
-print("✓ FOLDER LOGIC FIXED - Shows correct paths per folder")
-print("✓ ANIMATION FIXED - Natural smooth movement with velocity")
-print("✓ Auto-saves to: workspace/" .. FOLDER_NAME)
+print("\n✓ Script ready!")
+print("✓ COMPLETE REWRITE - All logic synchronized")
+print("✓ Recording: Clean start/stop")
+print("✓ Playing: Proper completion detection")
+print("✓ Play All: Sequential with callbacks")
+print("✓ No conflicts between modes")
 print(string.rep("=", 60) .. "\n")
