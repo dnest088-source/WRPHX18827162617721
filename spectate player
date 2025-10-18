@@ -1,5 +1,5 @@
--- WarpahSpectate Pro v5.0
--- Compact Professional Design
+-- WarpahSpectate Pro v5.3
+-- Fixed Free Camera Controls
 -- Mobile & Desktop Compatible
 
 local Players = game:GetService("Players")
@@ -16,23 +16,38 @@ local Config = {
     Enabled = false,
     CurrentTarget = nil,
     TargetIndex = 1,
-    ZoomLevel = 1,
-    CameraOffset = Vector3.new(0, 3, 8),
-    AutoRotate = false,
-    RotationSpeed = 0.3,
-    MinZoom = 0.5,
-    MaxZoom = 5,
     UI = {},
     IsMinimized = false,
     Connections = {},
     
-    -- Touch controls
-    TouchStartPos = nil,
-    InitialZoom = nil,
-    IsPinching = false
+    -- Camera settings
+    CameraAngleX = 0,
+    CameraAngleY = 0,
+    CameraDistance = 10,
+    MinZoom = 3,
+    MaxZoom = 100,
+    
+    -- Smooth values
+    CurrentAngleX = 0,
+    CurrentAngleY = 0,
+    CurrentDistance = 10,
+    
+    -- Controls
+    IsRotating = false,
+    LastInputPos = nil,
+    MouseSensitivity = 0.005,
+    TouchSensitivity = 0.008,
+    
+    -- Touch zoom
+    TouchPoints = {},
+    InitialPinchDist = nil,
+    InitialZoomDist = nil,
+    
+    -- Smoothing
+    SmoothFactor = 0.2
 }
 
--- Create Compact GUI
+-- Create GUI
 local function createGUI()
     local existing = LocalPlayer.PlayerGui:FindFirstChild("WarpahSpectate")
     if existing then existing:Destroy() end
@@ -43,7 +58,6 @@ local function createGUI()
     ScreenGui.ResetOnSpawn = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    -- Main Frame (Compact Size)
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
     MainFrame.Size = UDim2.new(0, 180, 0, 220)
@@ -56,13 +70,11 @@ local function createGUI()
     MainCorner.CornerRadius = UDim.new(0, 8)
     MainCorner.Parent = MainFrame
     
-    -- Simple Border
     local Border = Instance.new("UIStroke")
     Border.Color = Color3.fromRGB(60, 60, 70)
     Border.Thickness = 1
     Border.Parent = MainFrame
     
-    -- Title Bar (Compact)
     local TitleBar = Instance.new("Frame")
     TitleBar.Size = UDim2.new(1, 0, 0, 24)
     TitleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
@@ -80,7 +92,6 @@ local function createGUI()
     TitleFix.BorderSizePixel = 0
     TitleFix.Parent = TitleBar
     
-    -- Title Text
     local TitleText = Instance.new("TextLabel")
     TitleText.Size = UDim2.new(1, -60, 1, 0)
     TitleText.Position = UDim2.new(0, 6, 0, 0)
@@ -92,7 +103,6 @@ local function createGUI()
     TitleText.TextXAlignment = Enum.TextXAlignment.Left
     TitleText.Parent = TitleBar
     
-    -- Minimize Button
     local MinimizeBtn = Instance.new("TextButton")
     MinimizeBtn.Size = UDim2.new(0, 16, 0, 16)
     MinimizeBtn.Position = UDim2.new(1, -38, 0, 4)
@@ -107,7 +117,6 @@ local function createGUI()
     MinimizeCorner.CornerRadius = UDim.new(0, 3)
     MinimizeCorner.Parent = MinimizeBtn
     
-    -- Close Button
     local CloseBtn = Instance.new("TextButton")
     CloseBtn.Size = UDim2.new(0, 16, 0, 16)
     CloseBtn.Position = UDim2.new(1, -20, 0, 4)
@@ -122,19 +131,17 @@ local function createGUI()
     CloseCorner.CornerRadius = UDim.new(0, 3)
     CloseCorner.Parent = CloseBtn
     
-    -- Content Frame
     local ContentFrame = Instance.new("Frame")
     ContentFrame.Size = UDim2.new(1, 0, 1, -24)
     ContentFrame.Position = UDim2.new(0, 0, 0, 24)
     ContentFrame.BackgroundTransparency = 1
     ContentFrame.Parent = MainFrame
     
-    -- Toggle Button
     local ToggleBtn = Instance.new("TextButton")
     ToggleBtn.Size = UDim2.new(1, -12, 0, 22)
     ToggleBtn.Position = UDim2.new(0, 6, 0, 6)
     ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 200)
-    ToggleBtn.Text = "Enable"
+    ToggleBtn.Text = "Enable Spectate"
     ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     ToggleBtn.TextSize = 10
     ToggleBtn.Font = Enum.Font.Gotham
@@ -144,9 +151,8 @@ local function createGUI()
     ToggleCorner.CornerRadius = UDim.new(0, 4)
     ToggleCorner.Parent = ToggleBtn
     
-    -- Player List (Compact)
     local PlayerListFrame = Instance.new("ScrollingFrame")
-    PlayerListFrame.Size = UDim2.new(1, -12, 0, 90)
+    PlayerListFrame.Size = UDim2.new(1, -12, 0, 100)
     PlayerListFrame.Position = UDim2.new(0, 6, 0, 34)
     PlayerListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
     PlayerListFrame.BorderSizePixel = 0
@@ -163,10 +169,9 @@ local function createGUI()
     ListLayout.Padding = UDim.new(0, 1)
     ListLayout.Parent = PlayerListFrame
     
-    -- Controls (Compact)
     local ControlsFrame = Instance.new("Frame")
-    ControlsFrame.Size = UDim2.new(1, -12, 0, 60)
-    ControlsFrame.Position = UDim2.new(0, 6, 0, 130)
+    ControlsFrame.Size = UDim2.new(1, -12, 0, 50)
+    ControlsFrame.Position = UDim2.new(0, 6, 0, 140)
     ControlsFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
     ControlsFrame.BorderSizePixel = 0
     ControlsFrame.Parent = ContentFrame
@@ -175,61 +180,48 @@ local function createGUI()
     ControlsCorner.CornerRadius = UDim.new(0, 4)
     ControlsCorner.Parent = ControlsFrame
     
-    -- Navigation Buttons (Smaller)
     local PrevBtn = Instance.new("TextButton")
-    PrevBtn.Size = UDim2.new(0.32, -1, 0, 16)
+    PrevBtn.Size = UDim2.new(0.32, -1, 0, 18)
     PrevBtn.Position = UDim2.new(0, 3, 0, 3)
     PrevBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-    PrevBtn.Text = "◀"
+    PrevBtn.Text = "◀ Prev"
     PrevBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    PrevBtn.TextSize = 10
+    PrevBtn.TextSize = 9
     PrevBtn.Font = Enum.Font.Gotham
     PrevBtn.Parent = ControlsFrame
     
     local NextBtn = Instance.new("TextButton")
-    NextBtn.Size = UDim2.new(0.32, -1, 0, 16)
+    NextBtn.Size = UDim2.new(0.32, -1, 0, 18)
     NextBtn.Position = UDim2.new(0.34, 0, 0, 3)
     NextBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-    NextBtn.Text = "▶"
+    NextBtn.Text = "Next ▶"
     NextBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    NextBtn.TextSize = 10
+    NextBtn.TextSize = 9
     NextBtn.Font = Enum.Font.Gotham
     NextBtn.Parent = ControlsFrame
     
-    local TeleportBtn = Instance.new("TextButton")
-    TeleportBtn.Size = UDim2.new(0.34, -2, 0, 16)
-    TeleportBtn.Position = UDim2.new(0.66, 2, 0, 3)
-    TeleportBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 50)
-    TeleportBtn.Text = "TP"
-    TeleportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    TeleportBtn.TextSize = 10
-    TeleportBtn.Font = Enum.Font.Gotham
-    TeleportBtn.Parent = ControlsFrame
+    local ResetBtn = Instance.new("TextButton")
+    ResetBtn.Size = UDim2.new(0.34, -2, 0, 18)
+    ResetBtn.Position = UDim2.new(0.66, 2, 0, 3)
+    ResetBtn.BackgroundColor3 = Color3.fromRGB(100, 150, 80)
+    ResetBtn.Text = "Reset"
+    ResetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ResetBtn.TextSize = 9
+    ResetBtn.Font = Enum.Font.Gotham
+    ResetBtn.Parent = ControlsFrame
     
-    -- Auto Rotate
-    local AutoBtn = Instance.new("TextButton")
-    AutoBtn.Size = UDim2.new(1, -6, 0, 16)
-    AutoBtn.Position = UDim2.new(0, 3, 0, 22)
-    AutoBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 110)
-    AutoBtn.Text = "Auto: OFF"
-    AutoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    AutoBtn.TextSize = 9
-    AutoBtn.Font = Enum.Font.Gotham
-    AutoBtn.Parent = ControlsFrame
-    
-    -- Info Text (Compact)
     local InfoLabel = Instance.new("TextLabel")
-    InfoLabel.Size = UDim2.new(1, -6, 0, 16)
-    InfoLabel.Position = UDim2.new(0, 3, 0, 41)
+    InfoLabel.Size = UDim2.new(1, -6, 0, 26)
+    InfoLabel.Position = UDim2.new(0, 3, 0, 24)
     InfoLabel.BackgroundTransparency = 1
-    InfoLabel.Text = "F: Toggle | N/P: Switch | Pinch: Zoom"
-    InfoLabel.TextColor3 = Color3.fromRGB(120, 120, 120)
+    InfoLabel.Text = "🖱️ Hold & Drag: Rotate\n🔍 Scroll/Pinch: Zoom"
+    InfoLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
     InfoLabel.TextSize = 7
     InfoLabel.Font = Enum.Font.Gotham
+    InfoLabel.TextWrapped = true
     InfoLabel.Parent = ControlsFrame
     
-    -- Round all buttons
-    for _, btn in pairs({PrevBtn, NextBtn, TeleportBtn, AutoBtn}) do
+    for _, btn in pairs({PrevBtn, NextBtn, ResetBtn}) do
         local corner = Instance.new("UICorner")
         corner.CornerRadius = UDim.new(0, 3)
         corner.Parent = btn
@@ -244,116 +236,38 @@ local function createGUI()
         ContentFrame = ContentFrame,
         ToggleBtn = ToggleBtn,
         PlayerListFrame = PlayerListFrame,
-        ControlsFrame = ControlsFrame,
         PrevBtn = PrevBtn,
         NextBtn = NextBtn,
-        TeleportBtn = TeleportBtn,
-        AutoBtn = AutoBtn
+        ResetBtn = ResetBtn
     }
     
     return Config.UI
 end
 
--- Enhanced Dragging
+-- Dragging
 local function makeDraggable(frame, handle)
     local dragging = false
     local dragStart = nil
     local startPos = nil
     
-    -- Mouse dragging
     handle.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
             startPos = frame.Position
-            
-            -- Visual feedback
-            local tween = TweenService:Create(frame, TweenInfo.new(0.1), {
-                Size = frame.Size + UDim2.new(0, 2, 0, 2)
-            })
-            tween:Play()
         end
     end)
     
     UserInputService.InputChanged:Connect(function(input)
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
-            frame.Position = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
-            )
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
     
     UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            if dragging then
-                dragging = false
-                -- Reset visual feedback
-                local tween = TweenService:Create(frame, TweenInfo.new(0.1), {
-                    Size = UDim2.new(0, 180, 0, 220)
-                })
-                tween:Play()
-            end
-        end
-    end)
-end
-
--- Touch Zoom Implementation
-local function handleTouchZoom()
-    local touches = {}
-    
-    UserInputService.TouchStarted:Connect(function(touch, processed)
-        if not Config.Enabled then return end
-        touches[touch] = {Position = touch.Position, Time = tick()}
-    end)
-    
-    UserInputService.TouchMoved:Connect(function(touch, processed)
-        if not Config.Enabled or processed then return end
-        
-        local touchCount = 0
-        local touchPositions = {}
-        
-        for t, data in pairs(touches) do
-            if t.UserInputState == Enum.UserInputState.Change then
-                touchCount = touchCount + 1
-                table.insert(touchPositions, t.Position)
-            end
-        end
-        
-        -- Pinch to zoom with 2+ touches
-        if touchCount >= 2 then
-            local distance = (touchPositions[1] - touchPositions[2]).Magnitude
-            
-            if not Config.IsPinching then
-                Config.IsPinching = true
-                Config.InitialZoom = Config.ZoomLevel
-                Config.TouchStartPos = distance
-            else
-                local scale = Config.TouchStartPos / distance
-                Config.ZoomLevel = math.clamp(Config.InitialZoom * scale, Config.MinZoom, Config.MaxZoom)
-            end
-        end
-    end)
-    
-    UserInputService.TouchEnded:Connect(function(touch, processed)
-        touches[touch] = nil
-        
-        -- Reset pinch state when no touches
-        local hasActiveTouches = false
-        for t, data in pairs(touches) do
-            if t.UserInputState ~= Enum.UserInputState.End then
-                hasActiveTouches = true
-                break
-            end
-        end
-        
-        if not hasActiveTouches then
-            Config.IsPinching = false
-            Config.TouchStartPos = nil
-            Config.InitialZoom = nil
+            dragging = false
         end
     end)
 end
@@ -371,9 +285,7 @@ end
 
 -- Update player list
 local function updatePlayerList()
-    local playerList = Config.UI.PlayerListFrame
-    
-    for _, child in pairs(playerList:GetChildren()) do
+    for _, child in pairs(Config.UI.PlayerListFrame:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
     end
     
@@ -381,13 +293,13 @@ local function updatePlayerList()
     
     for i, player in pairs(validPlayers) do
         local playerBtn = Instance.new("TextButton")
-        playerBtn.Size = UDim2.new(1, -4, 0, 18)
+        playerBtn.Size = UDim2.new(1, -4, 0, 20)
         playerBtn.BackgroundColor3 = (Config.CurrentTarget == player) and Color3.fromRGB(50, 120, 200) or Color3.fromRGB(40, 40, 45)
         playerBtn.Text = player.DisplayName
         playerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         playerBtn.TextSize = 9
         playerBtn.Font = Enum.Font.Gotham
-        playerBtn.Parent = playerList
+        playerBtn.Parent = Config.UI.PlayerListFrame
         
         local btnCorner = Instance.new("UICorner")
         btnCorner.CornerRadius = UDim.new(0, 3)
@@ -400,7 +312,99 @@ local function updatePlayerList()
         end)
     end
     
-    playerList.CanvasSize = UDim2.new(0, 0, 0, #validPlayers * 19)
+    Config.UI.PlayerListFrame.CanvasSize = UDim2.new(0, 0, 0, #validPlayers * 21)
+end
+
+-- Camera rotation with mouse/touch
+local function setupCameraControls()
+    -- Mouse rotation
+    UserInputService.InputBegan:Connect(function(input, processed)
+        if not Config.Enabled or processed then return end
+        
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            Config.IsRotating = true
+            Config.LastInputPos = input.Position
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input, processed)
+        if not Config.Enabled then return end
+        
+        -- Mouse wheel zoom
+        if input.UserInputType == Enum.UserInputType.MouseWheel then
+            Config.CameraDistance = math.clamp(Config.CameraDistance - input.Position.Z * 2, Config.MinZoom, Config.MaxZoom)
+        end
+        
+        -- Mouse rotation
+        if Config.IsRotating and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - Config.LastInputPos
+            Config.CameraAngleY = Config.CameraAngleY - delta.X * Config.MouseSensitivity
+            Config.CameraAngleX = math.clamp(Config.CameraAngleX - delta.Y * Config.MouseSensitivity, -1.4, 1.4)
+            Config.LastInputPos = input.Position
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            Config.IsRotating = false
+        end
+    end)
+    
+    -- Touch controls
+    UserInputService.TouchStarted:Connect(function(touch, processed)
+        if not Config.Enabled or processed then return end
+        Config.TouchPoints[touch] = touch.Position
+    end)
+    
+    UserInputService.TouchMoved:Connect(function(touch, processed)
+        if not Config.Enabled or processed then return end
+        
+        local activeTouches = {}
+        for t, pos in pairs(Config.TouchPoints) do
+            if t.UserInputState ~= Enum.UserInputState.End then
+                table.insert(activeTouches, {touch = t, startPos = pos})
+            end
+        end
+        
+        -- Single touch rotation
+        if #activeTouches == 1 then
+            local delta = touch.Position - Config.TouchPoints[touch]
+            Config.CameraAngleY = Config.CameraAngleY - delta.X * Config.TouchSensitivity
+            Config.CameraAngleX = math.clamp(Config.CameraAngleX - delta.Y * Config.TouchSensitivity, -1.4, 1.4)
+            Config.TouchPoints[touch] = touch.Position
+        
+        -- Pinch zoom
+        elseif #activeTouches >= 2 then
+            local touch1 = activeTouches[1].touch
+            local touch2 = activeTouches[2].touch
+            local currentDist = (touch1.Position - touch2.Position).Magnitude
+            
+            if not Config.InitialPinchDist then
+                Config.InitialPinchDist = currentDist
+                Config.InitialZoomDist = Config.CameraDistance
+            else
+                local scale = Config.InitialPinchDist / currentDist
+                Config.CameraDistance = math.clamp(Config.InitialZoomDist * scale, Config.MinZoom, Config.MaxZoom)
+            end
+        end
+    end)
+    
+    UserInputService.TouchEnded:Connect(function(touch, processed)
+        Config.TouchPoints[touch] = nil
+        
+        local hasActive = false
+        for t, _ in pairs(Config.TouchPoints) do
+            if t.UserInputState ~= Enum.UserInputState.End then
+                hasActive = true
+                break
+            end
+        end
+        
+        if not hasActive then
+            Config.InitialPinchDist = nil
+            Config.InitialZoomDist = nil
+        end
+    end)
 end
 
 -- Smooth camera update
@@ -410,27 +414,20 @@ local function updateCamera()
     local target = Config.CurrentTarget
     if not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then return end
     
-    local targetPosition = target.Character.HumanoidRootPart.Position
-    local distance = 8 * Config.ZoomLevel
+    -- Smooth interpolation
+    Config.CurrentAngleX = Config.CurrentAngleX + (Config.CameraAngleX - Config.CurrentAngleX) * Config.SmoothFactor
+    Config.CurrentAngleY = Config.CurrentAngleY + (Config.CameraAngleY - Config.CurrentAngleY) * Config.SmoothFactor
+    Config.CurrentDistance = Config.CurrentDistance + (Config.CameraDistance - Config.CurrentDistance) * Config.SmoothFactor
     
-    local cameraOffset
-    if Config.AutoRotate then
-        local angle = tick() * Config.RotationSpeed
-        cameraOffset = Vector3.new(
-            math.cos(angle) * distance,
-            3,
-            math.sin(angle) * distance
-        )
-    else
-        cameraOffset = Vector3.new(0, 3, distance)
-    end
+    local targetPos = target.Character.HumanoidRootPart.Position
     
-    local cameraPosition = targetPosition + cameraOffset
-    local targetCFrame = CFrame.lookAt(cameraPosition, targetPosition)
+    -- Calculate camera position
+    local camX = math.cos(Config.CurrentAngleY) * math.cos(Config.CurrentAngleX) * Config.CurrentDistance
+    local camY = math.sin(Config.CurrentAngleX) * Config.CurrentDistance
+    local camZ = math.sin(Config.CurrentAngleY) * math.cos(Config.CurrentAngleX) * Config.CurrentDistance
     
-    -- Smooth transition
-    local currentCFrame = Camera.CFrame
-    Camera.CFrame = currentCFrame:Lerp(targetCFrame, 0.15)
+    local camPos = targetPos + Vector3.new(camX, camY, camZ)
+    Camera.CFrame = CFrame.lookAt(camPos, targetPos)
 end
 
 -- Switch player
@@ -439,24 +436,24 @@ local function switchPlayer(direction)
     if #validPlayers == 0 then return end
     
     Config.TargetIndex = Config.TargetIndex + direction
-    if Config.TargetIndex > #validPlayers then Config.TargetIndex = 1
-    elseif Config.TargetIndex < 1 then Config.TargetIndex = #validPlayers end
+    if Config.TargetIndex > #validPlayers then 
+        Config.TargetIndex = 1
+    elseif Config.TargetIndex < 1 then 
+        Config.TargetIndex = #validPlayers 
+    end
     
     Config.CurrentTarget = validPlayers[Config.TargetIndex]
     updatePlayerList()
 end
 
--- Teleport function
-local function teleportToPlayer()
-    if not Config.CurrentTarget or not Config.CurrentTarget.Character then return end
-    
-    local targetPos = Config.CurrentTarget.Character:FindFirstChild("HumanoidRootPart")
-    local localChar = LocalPlayer.Character
-    local localHRP = localChar and localChar:FindFirstChild("HumanoidRootPart")
-    
-    if targetPos and localHRP then
-        localHRP.CFrame = targetPos.CFrame + Vector3.new(0, 0, -3)
-    end
+-- Reset camera
+local function resetCamera()
+    Config.CameraAngleX = 0
+    Config.CameraAngleY = 0
+    Config.CameraDistance = 10
+    Config.CurrentAngleX = 0
+    Config.CurrentAngleY = 0
+    Config.CurrentDistance = 10
 end
 
 -- Toggle spectate
@@ -464,7 +461,7 @@ local function toggleSpectate()
     Config.Enabled = not Config.Enabled
     
     if Config.Enabled then
-        Config.UI.ToggleBtn.Text = "Disable"
+        Config.UI.ToggleBtn.Text = "Disable Spectate"
         Config.UI.ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
         
         local validPlayers = getValidPlayers()
@@ -474,8 +471,9 @@ local function toggleSpectate()
         end
         
         Camera.CameraType = Enum.CameraType.Scriptable
+        resetCamera()
     else
-        Config.UI.ToggleBtn.Text = "Enable"
+        Config.UI.ToggleBtn.Text = "Enable Spectate"
         Config.UI.ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 200)
         
         Camera.CameraType = Enum.CameraType.Custom
@@ -485,13 +483,6 @@ local function toggleSpectate()
     end
     
     updatePlayerList()
-end
-
--- Toggle auto rotate
-local function toggleAutoRotate()
-    Config.AutoRotate = not Config.AutoRotate
-    Config.UI.AutoBtn.BackgroundColor3 = Config.AutoRotate and Color3.fromRGB(50, 150, 80) or Color3.fromRGB(100, 100, 110)
-    Config.UI.AutoBtn.Text = Config.AutoRotate and "Auto: ON" or "Auto: OFF"
 end
 
 -- Toggle minimize
@@ -522,29 +513,29 @@ local function initialize()
     local ui = createGUI()
     
     makeDraggable(ui.MainFrame, ui.TitleBar)
-    handleTouchZoom()
+    setupCameraControls()
     
-    -- Connect events
     ui.MinimizeBtn.MouseButton1Click:Connect(toggleMinimize)
     ui.CloseBtn.MouseButton1Click:Connect(closeGUI)
     ui.ToggleBtn.MouseButton1Click:Connect(toggleSpectate)
     ui.PrevBtn.MouseButton1Click:Connect(function() switchPlayer(-1) end)
     ui.NextBtn.MouseButton1Click:Connect(function() switchPlayer(1) end)
-    ui.TeleportBtn.MouseButton1Click:Connect(teleportToPlayer)
-    ui.AutoBtn.MouseButton1Click:Connect(toggleAutoRotate)
+    ui.ResetBtn.MouseButton1Click:Connect(resetCamera)
     
-    Config.Connections[#Config.Connections + 1] = RunService.Heartbeat:Connect(updateCamera)
+    Config.Connections[#Config.Connections + 1] = RunService.RenderStepped:Connect(updateCamera)
     
-    -- Update player list periodically
     spawn(function()
         while Config.UI.ScreenGui and Config.UI.ScreenGui.Parent do
-            wait(1.5)
+            wait(2)
             updatePlayerList()
         end
     end)
     
     updatePlayerList()
-    print("Warpah Spectate Pro loaded successfully!")
+    
+    print("✅ Warpah Spectate Pro v5.3 Loaded!")
+    print("📱 MOBILE: Drag 1 finger = Rotate | Pinch = Zoom")
+    print("🖱️ PC: Hold & Drag = Rotate | Scroll = Zoom")
 end
 
 -- Keyboard shortcuts
@@ -558,11 +549,8 @@ UserInputService.InputBegan:Connect(function(input, processed)
     elseif input.KeyCode == Enum.KeyCode.P and Config.Enabled then
         switchPlayer(-1)
     elseif input.KeyCode == Enum.KeyCode.R and Config.Enabled then
-        toggleAutoRotate()
-    elseif input.KeyCode == Enum.KeyCode.T and Config.Enabled then
-        teleportToPlayer()
+        resetCamera()
     end
 end)
 
--- Start script
 initialize()
