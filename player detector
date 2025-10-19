@@ -1,6 +1,4 @@
--- Simple Player Detector - Click Name to Teleport
--- Design sama, tapi klik nama = teleport, deteksi jauh, data stabil
-
+-- Player Detector with Improved Professional Design
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -14,47 +12,43 @@ local headerFrame = nil
 local isMinimized = false
 local updateConnection = nil
 local lastUpdate = 0
-
--- Cache untuk data yang stabil (anti kedip-kedip)
 local playerDataCache = {}
 
--- Config sama seperti asli
 local config = {
-    guiSize = UDim2.new(0, 280, 0, 350),
-    minSize = UDim2.new(0, 280, 0, 40),
+    guiSize = UDim2.new(0, 320, 0, 400),
+    minSize = UDim2.new(0, 320, 0, 45),
     position = UDim2.new(0, 50, 0, 100),
-    updateRate = 2,  -- Update normal
-    playerEntryHeight = 55,
-    maxDetectionRange = math.huge -- Range tak terbatas tapi deteksi simple
+    updateRate = 2,
+    playerEntryHeight = 65,
+    maxDetectionRange = math.huge
 }
 
--- Warna sama
+-- Warna lebih profesional dan modern
 local colors = {
-    primary = Color3.fromRGB(15, 20, 25),
-    secondary = Color3.fromRGB(25, 30, 35),
-    accent = Color3.fromRGB(64, 156, 255),
+    bg = Color3.fromRGB(18, 18, 22),
+    surface = Color3.fromRGB(26, 26, 32),
+    surfaceHover = Color3.fromRGB(35, 35, 42),
+    primary = Color3.fromRGB(99, 102, 241),
+    primaryHover = Color3.fromRGB(79, 82, 221),
     success = Color3.fromRGB(34, 197, 94),
     danger = Color3.fromRGB(239, 68, 68),
-    warning = Color3.fromRGB(245, 158, 11),
-    text = Color3.fromRGB(248, 250, 252),
-    textSub = Color3.fromRGB(148, 163, 184),
-    border = Color3.fromRGB(51, 65, 85),
-    hover = Color3.fromRGB(55, 65, 81)
+    warning = Color3.fromRGB(251, 191, 36),
+    text = Color3.fromRGB(250, 250, 250),
+    textMuted = Color3.fromRGB(161, 161, 170),
+    border = Color3.fromRGB(39, 39, 42)
 }
 
--- SIMPLE Functions
 local function round(num)
     return math.floor(num + 0.5)
 end
 
 local function formatPosition(pos)
     if pos then
-        return string.format("X:%.0f Y:%.0f Z:%.0f", pos.X, pos.Y, pos.Z)
+        return string.format("%d, %d, %d", round(pos.X), round(pos.Y), round(pos.Z))
     end
-    return "No Position"
+    return "Unknown"
 end
 
--- Get position dengan range jauh - FIXED SIMPLE DETECTION
 local function getCharacterPosition(player)
     if player and player.Parent and player.Character and player.Character.Parent then
         local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
@@ -65,7 +59,6 @@ local function getCharacterPosition(player)
     return nil
 end
 
--- Distance calculation
 local function getDistance(pos1, pos2)
     if pos1 and pos2 then
         return round((pos1 - pos2).Magnitude)
@@ -73,7 +66,6 @@ local function getDistance(pos1, pos2)
     return 0
 end
 
--- TELEPORT - Langsung ke posisi player (range jauh)
 local function teleportToPlayer(targetPlayer)
     local success = pcall(function()
         local localChar = localPlayer.Character
@@ -87,13 +79,11 @@ local function teleportToPlayer(targetPlayer)
             return false
         end
         
-        -- Check if target player is actually alive
         local targetHumanoid = targetChar:FindFirstChild("Humanoid")
         if not targetHumanoid or targetHumanoid.Health <= 0 then
             return false
         end
         
-        -- Teleport langsung ke posisi player (tanpa jarak limit)
         local targetCFrame = targetChar.HumanoidRootPart.CFrame
         localChar.HumanoidRootPart.CFrame = targetCFrame + Vector3.new(0, 3, 0)
         
@@ -103,70 +93,50 @@ local function teleportToPlayer(targetPlayer)
     return success
 end
 
--- Create Modern Button (sama seperti asli)
-local function createModernButton(parent, size, position, text, bgColor, textColor, onClick)
+local function createButton(parent, size, position, config)
     local button = Instance.new("TextButton")
     button.Size = size
     button.Position = position
-    button.BackgroundColor3 = bgColor
-    button.Text = text
-    button.TextColor3 = textColor or colors.text
-    button.Font = Enum.Font.GothamSemibold
-    button.TextSize = 11
+    button.BackgroundColor3 = config.bg or colors.surface
+    button.Text = config.text or ""
+    button.TextColor3 = config.textColor or colors.text
+    button.Font = Enum.Font.GothamMedium
+    button.TextSize = config.textSize or 12
     button.BorderSizePixel = 0
-    button.ClipsDescendants = true
+    button.AutoButtonColor = false
     button.Parent = parent
     
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
+    corner.CornerRadius = UDim.new(0, 8)
     corner.Parent = button
     
-    local shadow = Instance.new("Frame")
-    shadow.Size = UDim2.new(1, 2, 1, 2)
-    shadow.Position = UDim2.new(0, 1, 0, 1)
-    shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    shadow.BackgroundTransparency = 0.8
-    shadow.BorderSizePixel = 0
-    shadow.ZIndex = button.ZIndex - 1
-    shadow.Parent = button
-    
-    local shadowCorner = Instance.new("UICorner")
-    shadowCorner.CornerRadius = UDim.new(0, 6)
-    shadowCorner.Parent = shadow
-    
-    if onClick then
-        button.MouseButton1Click:Connect(onClick)
+    if config.onClick then
+        button.MouseButton1Click:Connect(config.onClick)
     end
     
     button.MouseEnter:Connect(function()
-        TweenService:Create(button, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-            BackgroundColor3 = colors.hover,
-            Size = size + UDim2.new(0, 2, 0, 2)
+        TweenService:Create(button, TweenInfo.new(0.15), {
+            BackgroundColor3 = config.hoverBg or colors.surfaceHover
         }):Play()
     end)
     
     button.MouseLeave:Connect(function()
-        TweenService:Create(button, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-            BackgroundColor3 = bgColor,
-            Size = size
+        TweenService:Create(button, TweenInfo.new(0.15), {
+            BackgroundColor3 = config.bg or colors.surface
         }):Play()
     end)
     
     return button
 end
 
--- Update player data cache - FIXED SIMPLE DETECTION
 local function updatePlayerDataCache()
     local localPos = getCharacterPosition(localPlayer)
-    
-    -- Clear cache lama
     playerDataCache = {}
     
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= localPlayer and player.Parent then
             local pos = getCharacterPosition(player)
             
-            -- Simple detection - kalau ada posisi, masukkan
             if pos then
                 local distance = getDistance(localPos, pos)
                 
@@ -181,21 +151,17 @@ local function updatePlayerDataCache()
     end
 end
 
--- Update player list (menggunakan cache) - HANYA PLAYER AKTIF
 local function updatePlayerList()
     if not contentFrame or not contentFrame.Parent then return end
     
-    -- Update cache dulu
     updatePlayerDataCache()
     
-    -- Clear existing entries
     for _, child in pairs(contentFrame:GetChildren()) do
-        if child.Name:find("PlayerEntry") then
+        if child:IsA("GuiObject") then
             child:Destroy()
         end
     end
     
-    -- Convert cache to array and sort by distance
     local playerList = {}
     for _, data in pairs(playerDataCache) do
         table.insert(playerList, data)
@@ -205,89 +171,87 @@ local function updatePlayerList()
         return a.distance < b.distance
     end)
     
-    -- Create player entries - HANYA YANG AKTIF
     for i, data in pairs(playerList) do
-        local yPos = (i - 1) * config.playerEntryHeight + 5
+        local yPos = (i - 1) * config.playerEntryHeight + 8
         
-        -- Main container - CLICKABLE untuk teleport
         local container = Instance.new("TextButton")
         container.Name = "PlayerEntry" .. i
-        container.Size = UDim2.new(1, -10, 0, config.playerEntryHeight - 5)
-        container.Position = UDim2.new(0, 5, 0, yPos)
-        container.BackgroundColor3 = colors.secondary
+        container.Size = UDim2.new(1, -16, 0, config.playerEntryHeight - 8)
+        container.Position = UDim2.new(0, 8, 0, yPos)
+        container.BackgroundColor3 = colors.surface
         container.BorderSizePixel = 0
         container.Text = ""
         container.AutoButtonColor = false
         container.Parent = contentFrame
         
-        -- KLIK UNTUK TELEPORT
         container.MouseButton1Click:Connect(function()
-            container.BackgroundColor3 = colors.warning
             local success = teleportToPlayer(data.player)
             
-            if success then
-                container.BackgroundColor3 = colors.success
-                print("Teleported to " .. data.player.Name)
-            else
-                container.BackgroundColor3 = colors.danger
-                print("Failed to teleport to " .. data.player.Name)
-            end
+            TweenService:Create(container, TweenInfo.new(0.1), {
+                BackgroundColor3 = success and colors.success or colors.danger
+            }):Play()
             
-            wait(2)
-            container.BackgroundColor3 = colors.secondary
+            wait(0.3)
+            TweenService:Create(container, TweenInfo.new(0.2), {
+                BackgroundColor3 = colors.surface
+            }):Play()
         end)
         
         local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 8)
+        corner.CornerRadius = UDim.new(0, 10)
         corner.Parent = container
         
-        local gradient = Instance.new("UIGradient")
-        gradient.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, colors.secondary),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(colors.secondary.R + 0.02, colors.secondary.G + 0.02, colors.secondary.B + 0.02))
-        })
-        gradient.Rotation = 90
-        gradient.Parent = container
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = colors.border
+        stroke.Thickness = 1
+        stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        stroke.Parent = container
         
-        -- Player avatar
+        -- Avatar
         local avatar = Instance.new("ImageLabel")
-        avatar.Size = UDim2.new(0, 32, 0, 32)
-        avatar.Position = UDim2.new(0, 8, 0, 6)
+        avatar.Size = UDim2.new(0, 40, 0, 40)
+        avatar.Position = UDim2.new(0, 10, 0, 8)
         avatar.BackgroundTransparency = 1
         avatar.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. data.player.UserId .. "&width=48&height=48&format=png"
         avatar.Parent = container
         
         local avatarCorner = Instance.new("UICorner")
-        avatarCorner.CornerRadius = UDim.new(0, 16)
+        avatarCorner.CornerRadius = UDim.new(0, 8)
         avatarCorner.Parent = avatar
         
-        -- Player name (clickable indicator)
+        -- Status indicator
+        local statusDot = Instance.new("Frame")
+        statusDot.Size = UDim2.new(0, 10, 0, 10)
+        statusDot.Position = UDim2.new(0, 42, 0, 8)
+        statusDot.BackgroundColor3 = colors.success
+        statusDot.BorderSizePixel = 0
+        statusDot.ZIndex = 2
+        statusDot.Parent = container
+        
+        local dotCorner = Instance.new("UICorner")
+        dotCorner.CornerRadius = UDim.new(1, 0)
+        dotCorner.Parent = statusDot
+        
+        local dotStroke = Instance.new("UIStroke")
+        dotStroke.Color = colors.surface
+        dotStroke.Thickness = 2
+        dotStroke.Parent = statusDot
+        
+        -- Name
         local nameLabel = Instance.new("TextLabel")
-        nameLabel.Size = UDim2.new(0.6, -45, 0, 18)
-        nameLabel.Position = UDim2.new(0, 45, 0, 2)
+        nameLabel.Size = UDim2.new(0, 180, 0, 20)
+        nameLabel.Position = UDim2.new(0, 58, 0, 8)
         nameLabel.BackgroundTransparency = 1
-        nameLabel.Text = data.player.Name .. " [CLICK TO TP]"
-        nameLabel.TextColor3 = colors.accent
+        nameLabel.Text = data.player.Name
+        nameLabel.TextColor3 = colors.text
         nameLabel.Font = Enum.Font.GothamSemibold
-        nameLabel.TextSize = 10
+        nameLabel.TextSize = 13
         nameLabel.TextXAlignment = Enum.TextXAlignment.Left
         nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
         nameLabel.Parent = container
         
-        -- Coordinates
-        local coordLabel = Instance.new("TextLabel")
-        coordLabel.Size = UDim2.new(0.6, -45, 0, 14)
-        coordLabel.Position = UDim2.new(0, 45, 0, 20)
-        coordLabel.BackgroundTransparency = 1
-        coordLabel.Text = formatPosition(data.position)
-        coordLabel.TextColor3 = colors.textSub
-        coordLabel.Font = Enum.Font.Gotham
-        coordLabel.TextSize = 8
-        coordLabel.TextXAlignment = Enum.TextXAlignment.Left
-        coordLabel.Parent = container
-        
-        -- Distance - NORMAL DISPLAY
-        local distanceText = data.distance .. "m away"
+        -- Distance badge
+        local distanceText = data.distance .. "m"
         local distColor = colors.success
         
         if data.distance > 100 then
@@ -297,100 +261,103 @@ local function updatePlayerList()
             distColor = colors.danger
         end
         
+        local distBadge = Instance.new("Frame")
+        distBadge.Size = UDim2.new(0, 60, 0, 20)
+        distBadge.Position = UDim2.new(1, -70, 0, 8)
+        distBadge.BackgroundColor3 = distColor
+        distBadge.BorderSizePixel = 0
+        distBadge.Parent = container
+        
+        local badgeCorner = Instance.new("UICorner")
+        badgeCorner.CornerRadius = UDim.new(0, 6)
+        badgeCorner.Parent = distBadge
+        
         local distLabel = Instance.new("TextLabel")
-        distLabel.Size = UDim2.new(0.6, -45, 0, 12)
-        distLabel.Position = UDim2.new(0, 45, 0, 35)
+        distLabel.Size = UDim2.new(1, 0, 1, 0)
         distLabel.BackgroundTransparency = 1
         distLabel.Text = distanceText
-        distLabel.TextColor3 = distColor
-        distLabel.Font = Enum.Font.Gotham
-        distLabel.TextSize = 9
-        distLabel.TextXAlignment = Enum.TextXAlignment.Left
-        distLabel.Parent = container
+        distLabel.TextColor3 = colors.bg
+        distLabel.Font = Enum.Font.GothamBold
+        distLabel.TextSize = 11
+        distLabel.Parent = distBadge
         
-        -- Status dot (selalu hijau karena semua player aktif)
-        local statusDot = Instance.new("Frame")
-        statusDot.Size = UDim2.new(0, 10, 0, 10)
-        statusDot.Position = UDim2.new(0, 32, 0, 2)
-        statusDot.BackgroundColor3 = colors.success
-        statusDot.BorderSizePixel = 0
-        statusDot.Parent = container
+        -- Coordinates
+        local coordLabel = Instance.new("TextLabel")
+        coordLabel.Size = UDim2.new(0, 180, 0, 16)
+        coordLabel.Position = UDim2.new(0, 58, 0, 30)
+        coordLabel.BackgroundTransparency = 1
+        coordLabel.Text = formatPosition(data.position)
+        coordLabel.TextColor3 = colors.textMuted
+        coordLabel.Font = Enum.Font.GothamMedium
+        coordLabel.TextSize = 10
+        coordLabel.TextXAlignment = Enum.TextXAlignment.Left
+        coordLabel.Parent = container
         
-        local dotCorner = Instance.new("UICorner")
-        dotCorner.CornerRadius = UDim.new(0, 5)
-        dotCorner.Parent = statusDot
-        
-        -- Hover effects
         container.MouseEnter:Connect(function()
-            TweenService:Create(container, TweenInfo.new(0.2), {
-                BackgroundColor3 = colors.hover
+            TweenService:Create(container, TweenInfo.new(0.15), {
+                BackgroundColor3 = colors.surfaceHover
+            }):Play()
+            TweenService:Create(stroke, TweenInfo.new(0.15), {
+                Color = colors.primary
             }):Play()
         end)
         
         container.MouseLeave:Connect(function()
-            TweenService:Create(container, TweenInfo.new(0.2), {
-                BackgroundColor3 = colors.secondary
+            TweenService:Create(container, TweenInfo.new(0.15), {
+                BackgroundColor3 = colors.surface
+            }):Play()
+            TweenService:Create(stroke, TweenInfo.new(0.15), {
+                Color = colors.border
             }):Play()
         end)
     end
     
-    -- Update canvas size
-    contentFrame.CanvasSize = UDim2.new(0, 0, 0, #playerList * config.playerEntryHeight + 20)
+    contentFrame.CanvasSize = UDim2.new(0, 0, 0, #playerList * config.playerEntryHeight + 16)
     
-    -- Update header count - semua player yang ditampilkan adalah ready
     if headerFrame and headerFrame:FindFirstChild("CountLabel") then
-        headerFrame.CountLabel.Text = #playerList .. "/" .. #playerList .. " ready"
+        headerFrame.CountLabel.Text = #playerList .. " Players"
     end
 end
 
--- Toggle minimize (sama)
 local function toggleMinimize()
     isMinimized = not isMinimized
     
-    local tweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+    local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
     
     if isMinimized then
         TweenService:Create(mainFrame, tweenInfo, {Size = config.minSize}):Play()
         contentFrame.Visible = false
     else
         TweenService:Create(mainFrame, tweenInfo, {Size = config.guiSize}):Play()
-        wait(0.3)
+        wait(0.2)
         contentFrame.Visible = true
         updatePlayerList()
     end
     
     local minBtn = headerFrame:FindFirstChild("MinButton")
     if minBtn then
-        minBtn.Text = isMinimized and "□" or "−"
+        minBtn.Text = isMinimized and "+" or "–"
     end
 end
 
--- Close GUI (sama)
 local function closeGUI()
     if updateConnection then
         updateConnection:Disconnect()
     end
     
     if gui then
-        TweenService:Create(gui, TweenInfo.new(0.3), {
-            Enabled = false
-        }):Play()
-        
-        wait(0.3)
         gui:Destroy()
     end
     
     gui = nil
     playerDataCache = {}
-    print("Player Detector Closed")
 end
 
--- Create GUI (sama persis)
 local function createGUI()
     if gui then gui:Destroy() end
     
     gui = Instance.new("ScreenGui")
-    gui.Name = "UltraCompactPlayerDetector"
+    gui.Name = "PlayerDetector"
     gui.Parent = CoreGui
     gui.ResetOnSpawn = false
     gui.IgnoreGuiInset = true
@@ -398,121 +365,105 @@ local function createGUI()
     mainFrame = Instance.new("Frame")
     mainFrame.Size = config.guiSize
     mainFrame.Position = config.position
-    mainFrame.BackgroundColor3 = colors.primary
-    mainFrame.BackgroundTransparency = 0.05
+    mainFrame.BackgroundColor3 = colors.bg
     mainFrame.BorderSizePixel = 0
     mainFrame.Active = true
     mainFrame.Draggable = true
     mainFrame.Parent = gui
     
     local mainCorner = Instance.new("UICorner")
-    mainCorner.CornerRadius = UDim.new(0, 15)
+    mainCorner.CornerRadius = UDim.new(0, 12)
     mainCorner.Parent = mainFrame
     
-    local shadow = Instance.new("Frame")
-    shadow.Size = UDim2.new(1, 10, 1, 10)
-    shadow.Position = UDim2.new(0, -5, 0, -5)
-    shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    shadow.BackgroundTransparency = 0.7
-    shadow.BorderSizePixel = 0
-    shadow.ZIndex = mainFrame.ZIndex - 1
-    shadow.Parent = mainFrame
+    local mainStroke = Instance.new("UIStroke")
+    mainStroke.Color = colors.border
+    mainStroke.Thickness = 1
+    mainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    mainStroke.Parent = mainFrame
     
-    local shadowCorner = Instance.new("UICorner")
-    shadowCorner.CornerRadius = UDim.new(0, 15)
-    shadowCorner.Parent = shadow
-    
+    -- Header
     headerFrame = Instance.new("Frame")
-    headerFrame.Size = UDim2.new(1, 0, 0, 40)
+    headerFrame.Size = UDim2.new(1, 0, 0, 45)
     headerFrame.Position = UDim2.new(0, 0, 0, 0)
-    headerFrame.BackgroundColor3 = colors.secondary
+    headerFrame.BackgroundTransparency = 1
     headerFrame.BorderSizePixel = 0
     headerFrame.Parent = mainFrame
     
-    local headerCorner = Instance.new("UICorner")
-    headerCorner.CornerRadius = UDim.new(0, 15)
-    headerCorner.Parent = headerFrame
-    
-    local headerFix = Instance.new("Frame")
-    headerFix.Size = UDim2.new(1, 0, 0, 15)
-    headerFix.Position = UDim2.new(0, 0, 1, -15)
-    headerFix.BackgroundColor3 = colors.secondary
-    headerFix.BorderSizePixel = 0
-    headerFix.Parent = headerFrame
-    
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(0.4, 0, 1, 0)
-    titleLabel.Position = UDim2.new(0, 15, 0, 0)
+    titleLabel.Size = UDim2.new(0, 150, 1, 0)
+    titleLabel.Position = UDim2.new(0, 16, 0, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "Player Detector"
+    titleLabel.Text = "Players"
     titleLabel.TextColor3 = colors.text
     titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextSize = 12
+    titleLabel.TextSize = 15
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.Parent = headerFrame
     
     local countLabel = Instance.new("TextLabel")
     countLabel.Name = "CountLabel"
-    countLabel.Size = UDim2.new(0.25, 0, 1, 0)
-    countLabel.Position = UDim2.new(0.4, 0, 0, 0)
+    countLabel.Size = UDim2.new(0, 80, 1, 0)
+    countLabel.Position = UDim2.new(0, 166, 0, 0)
     countLabel.BackgroundTransparency = 1
-    countLabel.Text = "0/0 ready"
-    countLabel.TextColor3 = colors.success
-    countLabel.Font = Enum.Font.GothamSemibold
-    countLabel.TextSize = 10
-    countLabel.TextXAlignment = Enum.TextXAlignment.Center
+    countLabel.Text = "0 Players"
+    countLabel.TextColor3 = colors.textMuted
+    countLabel.Font = Enum.Font.GothamMedium
+    countLabel.TextSize = 11
+    countLabel.TextXAlignment = Enum.TextXAlignment.Left
     countLabel.Parent = headerFrame
     
-    local refreshBtn = createModernButton(
-        headerFrame, UDim2.new(0, 25, 0, 25), UDim2.new(1, -85, 0, 8),
-        "⟲", colors.success, colors.text,
-        function()
-            refreshBtn.Text = "..."
-            spawn(function()
-                updatePlayerList()
-                wait(0.5)
-                refreshBtn.Text = "✓"
-                wait(1)
-                refreshBtn.Text = "⟲"
-            end)
+    local refreshBtn = createButton(headerFrame, UDim2.new(0, 28, 0, 28), UDim2.new(1, -98, 0.5, -14), {
+        text = "↻",
+        textSize = 14,
+        bg = colors.surface,
+        hoverBg = colors.primary,
+        onClick = function()
+            updatePlayerList()
         end
-    )
+    })
     
-    local minBtn = createModernButton(
-        headerFrame, UDim2.new(0, 25, 0, 25), UDim2.new(1, -55, 0, 8),
-        "−", colors.warning, colors.text, toggleMinimize
-    )
+    local minBtn = createButton(headerFrame, UDim2.new(0, 28, 0, 28), UDim2.new(1, -64, 0.5, -14), {
+        text = "–",
+        textSize = 16,
+        bg = colors.surface,
+        hoverBg = colors.warning,
+        onClick = toggleMinimize
+    })
     minBtn.Name = "MinButton"
     
-    local closeBtn = createModernButton(
-        headerFrame, UDim2.new(0, 25, 0, 25), UDim2.new(1, -25, 0, 8),
-        "✕", colors.danger, colors.text, closeGUI
-    )
+    local closeBtn = createButton(headerFrame, UDim2.new(0, 28, 0, 28), UDim2.new(1, -30, 0.5, -14), {
+        text = "×",
+        textSize = 18,
+        bg = colors.surface,
+        hoverBg = colors.danger,
+        onClick = closeGUI
+    })
+    
+    -- Divider
+    local divider = Instance.new("Frame")
+    divider.Size = UDim2.new(1, -32, 0, 1)
+    divider.Position = UDim2.new(0, 16, 0, 45)
+    divider.BackgroundColor3 = colors.border
+    divider.BorderSizePixel = 0
+    divider.Parent = mainFrame
     
     contentFrame = Instance.new("ScrollingFrame")
-    contentFrame.Size = UDim2.new(1, 0, 1, -40)
-    contentFrame.Position = UDim2.new(0, 0, 0, 40)
-    contentFrame.BackgroundColor3 = colors.primary
+    contentFrame.Size = UDim2.new(1, 0, 1, -46)
+    contentFrame.Position = UDim2.new(0, 0, 0, 46)
+    contentFrame.BackgroundTransparency = 1
     contentFrame.BorderSizePixel = 0
-    contentFrame.ScrollBarThickness = 3
-    contentFrame.ScrollBarImageColor3 = colors.accent
-    contentFrame.CanvasSize = UDim2.new(0, 0, 0, 100)
+    contentFrame.ScrollBarThickness = 4
+    contentFrame.ScrollBarImageColor3 = colors.border
+    contentFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
     contentFrame.Parent = mainFrame
-    
-    print("GUI Created - Click Player Names to Teleport!")
 end
 
--- Start Function
 local function startDetector()
-    print("Starting Player Detector with Infinite Range...")
-    
     createGUI()
     
-    -- Initial update
     wait(1)
     updatePlayerList()
     
-    -- Auto-update loop
     updateConnection = RunService.Heartbeat:Connect(function()
         if tick() - lastUpdate >= config.updateRate then
             if gui and mainFrame and mainFrame.Parent and not isMinimized then
@@ -521,11 +472,8 @@ local function startDetector()
             lastUpdate = tick()
         end
     end)
-    
-    print("Player Detector Started! Infinite range detection active.")
 end
 
--- Player Events
 Players.PlayerAdded:Connect(function(player)
     wait(2)
     if gui and not isMinimized then
@@ -540,7 +488,6 @@ Players.PlayerRemoving:Connect(function(player)
     end
 end)
 
--- Global API
 _G.PlayerDetector = {
     start = startDetector,
     stop = closeGUI,
@@ -549,5 +496,4 @@ _G.PlayerDetector = {
     teleportTo = teleportToPlayer
 }
 
--- Auto start
 startDetector()
