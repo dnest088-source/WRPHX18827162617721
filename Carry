@@ -1,5 +1,5 @@
 -- Warpah Carry - Stealth Carry System
--- Compact Professional Design
+-- Compact Professional Design (Fixed Version)
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -13,66 +13,20 @@ end
 local Config = {
     CarryEnabled = false,
     TargetPlayer = nil,
-    FollowDistance = 0.5,
-    InvisibleMode = true,
+    FollowDistance = 0, -- Sejajar/menempel dengan target
+    InvisibleMode = false, -- Invisible mode dinonaktifkan
     IsMinimized = false
 }
 
+-- Fungsi invisible dihilangkan/dinonaktifkan
 local function MakeInvisible()
-    if not Config.InvisibleMode then return end
-    
-    pcall(function()
-        local char = LocalPlayer.Character
-        if char then
-            for _, part in pairs(char:GetDescendants()) do
-                if part:IsA("BasePart") or part:IsA("Decal") then
-                    part.Transparency = 1
-                elseif part:IsA("Accessory") then
-                    for _, accessoryPart in pairs(part:GetDescendants()) do
-                        if accessoryPart:IsA("BasePart") then
-                            accessoryPart.Transparency = 1
-                        end
-                    end
-                end
-            end
-            
-            if char:FindFirstChild("Head") then
-                for _, child in pairs(char.Head:GetChildren()) do
-                    if child:IsA("BillboardGui") then
-                        child.Enabled = false
-                    end
-                end
-            end
-        end
-    end)
+    -- Fungsi ini dinonaktifkan
+    return
 end
 
 local function MakeVisible()
-    pcall(function()
-        local char = LocalPlayer.Character
-        if char then
-            for _, part in pairs(char:GetDescendants()) do
-                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                    part.Transparency = 0
-                elseif part:IsA("Accessory") then
-                    for _, accessoryPart in pairs(part:GetDescendants()) do
-                        if accessoryPart:IsA("BasePart") then
-                            accessoryPart.Transparency = 0
-                        end
-                    end
-                end
-            end
-            
-            if char:FindFirstChild("Head") then
-                char.Head.Transparency = 0
-                for _, child in pairs(char.Head:GetChildren()) do
-                    if child:IsA("BillboardGui") then
-                        child.Enabled = true
-                    end
-                end
-            end
-        end
-    end)
+    -- Tidak perlu lagi karena tidak ada invisible mode
+    return
 end
 
 local function GetAllPlayersWithDistance()
@@ -117,20 +71,50 @@ local function FollowPlayer()
         if targetChar and localChar and targetChar:FindFirstChild("HumanoidRootPart") and localChar:FindFirstChild("HumanoidRootPart") then
             local targetRoot = targetChar.HumanoidRootPart
             local localRoot = localChar.HumanoidRootPart
+            local targetHumanoid = targetChar:FindFirstChild("Humanoid")
             
+            -- Ambil arah belakang dari target dengan offset yang lebih tepat
             local backDirection = -targetRoot.CFrame.LookVector
-            local backPosition = targetRoot.Position + (backDirection * Config.FollowDistance)
-            local newPosition = Vector3.new(backPosition.X, targetRoot.Position.Y, backPosition.Z)
-            local lookAtTarget = CFrame.new(newPosition, Vector3.new(targetRoot.Position.X, newPosition.Y, targetRoot.Position.Z))
             
-            localRoot.CFrame = lookAtTarget
+            -- Posisi tepat di belakang target, sejajar dan menempel
+            local offset = Config.FollowDistance
+            local backPosition = targetRoot.Position + (backDirection * offset)
             
+            -- Sejajarkan tinggi dengan target
+            local newPosition = Vector3.new(
+                backPosition.X, 
+                targetRoot.Position.Y, -- Gunakan Y position yang sama dengan target
+                backPosition.Z
+            )
+            
+            -- Buat CFrame yang menghadap ke arah yang sama dengan target
+            local newCFrame = CFrame.new(newPosition) * targetRoot.CFrame.Rotation
+            
+            -- Set posisi dan rotasi karakter kita
+            localRoot.CFrame = newCFrame
+            
+            -- Set velocity agar mengikuti gerakan target
             if localRoot:FindFirstChild("BodyVelocity") then
                 localRoot.BodyVelocity:Destroy()
             end
             
-            if Config.InvisibleMode then
-                MakeInvisible()
+            local bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
+            
+            -- Jika target bergerak, ikuti kecepatannya
+            if targetHumanoid and targetHumanoid.WalkSpeed > 0 then
+                local targetVelocity = targetRoot.AssemblyLinearVelocity
+                bodyVelocity.Velocity = targetVelocity
+            else
+                bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+            end
+            
+            bodyVelocity.Parent = localRoot
+            
+            -- Delay untuk hapus BodyVelocity agar tidak mengganggu movement
+            wait(0.05)
+            if bodyVelocity and bodyVelocity.Parent then
+                bodyVelocity:Destroy()
             end
         end
     end)
@@ -201,7 +185,7 @@ local function CreateGUI()
     Title.Size = UDim2.new(1, -80, 1, 0)
     Title.Position = UDim2.new(0, 12, 0, 0)
     Title.BackgroundTransparency = 1
-    Title.Text = "Warpah Carry"
+    Title.Text = "Warpah Carry (Fixed)"
     Title.TextColor3 = Color3.fromRGB(240, 240, 245)
     Title.TextSize = 14
     Title.Font = Enum.Font.GothamBold
@@ -209,59 +193,54 @@ local function CreateGUI()
     Title.Parent = Header
     
     -- Buttons Container
-    local ButtonsFrame = Instance.new("Frame")
-    ButtonsFrame.Size = UDim2.new(0, 60, 0, 25)
-    ButtonsFrame.Position = UDim2.new(1, -70, 0, 10)
-    ButtonsFrame.BackgroundTransparency = 1
-    ButtonsFrame.Parent = Header
+    local ButtonsContainer = Instance.new("Frame")
+    ButtonsContainer.Size = UDim2.new(0, 70, 1, 0)
+    ButtonsContainer.Position = UDim2.new(1, -70, 0, 0)
+    ButtonsContainer.BackgroundTransparency = 1
+    ButtonsContainer.Parent = Header
     
-    local ButtonLayout = Instance.new("UIListLayout")
-    ButtonLayout.FillDirection = Enum.FillDirection.Horizontal
-    ButtonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-    ButtonLayout.Padding = UDim.new(0, 6)
-    ButtonLayout.Parent = ButtonsFrame
-    
-    -- Minimize
     local MinimizeBtn = Instance.new("TextButton")
-    MinimizeBtn.Size = UDim2.new(0, 25, 0, 25)
+    MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+    MinimizeBtn.Position = UDim2.new(0, 5, 0.5, -15)
     MinimizeBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
+    MinimizeBtn.BorderSizePixel = 0
     MinimizeBtn.Text = "−"
     MinimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 210)
     MinimizeBtn.TextSize = 16
     MinimizeBtn.Font = Enum.Font.GothamBold
-    MinimizeBtn.Parent = ButtonsFrame
+    MinimizeBtn.Parent = ButtonsContainer
     
     local MinCorner = Instance.new("UICorner")
-    MinCorner.CornerRadius = UDim.new(0, 4)
+    MinCorner.CornerRadius = UDim.new(0, 6)
     MinCorner.Parent = MinimizeBtn
     
-    -- Close
     local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Size = UDim2.new(0, 25, 0, 25)
+    CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+    CloseBtn.Position = UDim2.new(0, 37, 0.5, -15)
     CloseBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
+    CloseBtn.BorderSizePixel = 0
     CloseBtn.Text = "×"
     CloseBtn.TextColor3 = Color3.fromRGB(200, 200, 210)
-    CloseBtn.TextSize = 18
+    CloseBtn.TextSize = 20
     CloseBtn.Font = Enum.Font.GothamBold
-    CloseBtn.Parent = ButtonsFrame
+    CloseBtn.Parent = ButtonsContainer
     
     local CloseCorner = Instance.new("UICorner")
-    CloseCorner.CornerRadius = UDim.new(0, 4)
+    CloseCorner.CornerRadius = UDim.new(0, 6)
     CloseCorner.Parent = CloseBtn
     
     -- Content
     local Content = Instance.new("Frame")
     Content.Name = "Content"
-    Content.Size = UDim2.new(1, 0, 1, -45)
-    Content.Position = UDim2.new(0, 0, 0, 45)
+    Content.Size = UDim2.new(1, -20, 1, -65)
+    Content.Position = UDim2.new(0, 10, 0, 55)
     Content.BackgroundTransparency = 1
     Content.Parent = MainFrame
     
-    -- Status
+    -- Status Container
     local StatusFrame = Instance.new("Frame")
-    StatusFrame.Size = UDim2.new(1, -16, 0, 36)
-    StatusFrame.Position = UDim2.new(0, 8, 0, 8)
-    StatusFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+    StatusFrame.Size = UDim2.new(1, 0, 0, 30)
+    StatusFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
     StatusFrame.BorderSizePixel = 0
     StatusFrame.Parent = Content
     
@@ -271,7 +250,7 @@ local function CreateGUI()
     
     local StatusDot = Instance.new("Frame")
     StatusDot.Size = UDim2.new(0, 8, 0, 8)
-    StatusDot.Position = UDim2.new(0, 10, 0.5, -4)
+    StatusDot.Position = UDim2.new(0, 12, 0.5, -4)
     StatusDot.BackgroundColor3 = Color3.fromRGB(239, 68, 68)
     StatusDot.BorderSizePixel = 0
     StatusDot.Parent = StatusFrame
@@ -281,244 +260,322 @@ local function CreateGUI()
     DotCorner.Parent = StatusDot
     
     local StatusText = Instance.new("TextLabel")
-    StatusText.Name = "StatusText"
-    StatusText.Size = UDim2.new(1, -28, 1, 0)
-    StatusText.Position = UDim2.new(0, 24, 0, 0)
+    StatusText.Size = UDim2.new(1, -30, 1, 0)
+    StatusText.Position = UDim2.new(0, 26, 0, 0)
     StatusText.BackgroundTransparency = 1
     StatusText.Text = "Idle"
-    StatusText.TextColor3 = Color3.fromRGB(180, 180, 190)
+    StatusText.TextColor3 = Color3.fromRGB(180, 180, 195)
     StatusText.TextSize = 11
-    StatusText.Font = Enum.Font.Gotham
+    StatusText.Font = Enum.Font.GothamMedium
     StatusText.TextXAlignment = Enum.TextXAlignment.Left
     StatusText.Parent = StatusFrame
     
-    -- Search
-    local SearchBox = Instance.new("TextBox")
-    SearchBox.Size = UDim2.new(1, -16, 0, 32)
-    SearchBox.Position = UDim2.new(0, 8, 0, 52)
-    SearchBox.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
-    SearchBox.BorderSizePixel = 0
-    SearchBox.PlaceholderText = "Search..."
-    SearchBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
-    SearchBox.Text = ""
-    SearchBox.TextColor3 = Color3.fromRGB(220, 220, 230)
-    SearchBox.TextSize = 11
-    SearchBox.Font = Enum.Font.Gotham
-    SearchBox.ClearTextOnFocus = false
-    SearchBox.Parent = Content
+    -- Search Box
+    local SearchFrame = Instance.new("Frame")
+    SearchFrame.Size = UDim2.new(1, 0, 0, 32)
+    SearchFrame.Position = UDim2.new(0, 0, 0, 40)
+    SearchFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
+    SearchFrame.BorderSizePixel = 0
+    SearchFrame.Parent = Content
     
     local SearchCorner = Instance.new("UICorner")
     SearchCorner.CornerRadius = UDim.new(0, 6)
-    SearchCorner.Parent = SearchBox
+    SearchCorner.Parent = SearchFrame
     
-    local SearchPad = Instance.new("UIPadding")
-    SearchPad.PaddingLeft = UDim.new(0, 10)
-    SearchPad.PaddingRight = UDim.new(0, 10)
-    SearchPad.Parent = SearchBox
+    local SearchIcon = Instance.new("TextLabel")
+    SearchIcon.Size = UDim2.new(0, 30, 1, 0)
+    SearchIcon.BackgroundTransparency = 1
+    SearchIcon.Text = "🔍"
+    SearchIcon.TextColor3 = Color3.fromRGB(130, 130, 145)
+    SearchIcon.TextSize = 14
+    SearchIcon.Font = Enum.Font.Gotham
+    SearchIcon.Parent = SearchFrame
     
-    -- Player List
+    local SearchBox = Instance.new("TextBox")
+    SearchBox.Size = UDim2.new(1, -35, 1, 0)
+    SearchBox.Position = UDim2.new(0, 30, 0, 0)
+    SearchBox.BackgroundTransparency = 1
+    SearchBox.PlaceholderText = "Search players..."
+    SearchBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
+    SearchBox.Text = ""
+    SearchBox.TextColor3 = Color3.fromRGB(200, 200, 210)
+    SearchBox.TextSize = 11
+    SearchBox.Font = Enum.Font.Gotham
+    SearchBox.TextXAlignment = Enum.TextXAlignment.Left
+    SearchBox.ClearTextOnFocus = false
+    SearchBox.Parent = SearchFrame
+    
+    -- Players List
+    local ListFrame = Instance.new("Frame")
+    ListFrame.Size = UDim2.new(1, 0, 1, -155)
+    ListFrame.Position = UDim2.new(0, 0, 0, 82)
+    ListFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+    ListFrame.BorderSizePixel = 0
+    ListFrame.Parent = Content
+    
+    local ListCorner = Instance.new("UICorner")
+    ListCorner.CornerRadius = UDim.new(0, 6)
+    ListCorner.Parent = ListFrame
+    
     local ScrollFrame = Instance.new("ScrollingFrame")
-    ScrollFrame.Name = "PlayerList"
-    ScrollFrame.Size = UDim2.new(1, -16, 1, -132)
-    ScrollFrame.Position = UDim2.new(0, 8, 0, 92)
-    ScrollFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+    ScrollFrame.Size = UDim2.new(1, -4, 1, -4)
+    ScrollFrame.Position = UDim2.new(0, 2, 0, 2)
+    ScrollFrame.BackgroundTransparency = 1
     ScrollFrame.BorderSizePixel = 0
-    ScrollFrame.ScrollBarThickness = 3
-    ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 230, 118)
+    ScrollFrame.ScrollBarThickness = 4
+    ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(45, 45, 52)
     ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    ScrollFrame.Parent = Content
-    
-    local ScrollCorner = Instance.new("UICorner")
-    ScrollCorner.CornerRadius = UDim.new(0, 6)
-    ScrollCorner.Parent = ScrollFrame
+    ScrollFrame.Parent = ListFrame
     
     local ListLayout = Instance.new("UIListLayout")
-    ListLayout.Padding = UDim.new(0, 4)
     ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    ListLayout.Padding = UDim.new(0, 4)
     ListLayout.Parent = ScrollFrame
     
-    local ListPad = Instance.new("UIPadding")
-    ListPad.PaddingLeft = UDim.new(0, 6)
-    ListPad.PaddingRight = UDim.new(0, 6)
-    ListPad.PaddingTop = UDim.new(0, 6)
-    ListPad.PaddingBottom = UDim.new(0, 6)
-    ListPad.Parent = ScrollFrame
-    
-    -- Bottom Buttons
-    local BottomFrame = Instance.new("Frame")
-    BottomFrame.Size = UDim2.new(1, -16, 0, 32)
-    BottomFrame.Position = UDim2.new(0, 8, 1, -40)
-    BottomFrame.BackgroundTransparency = 1
-    BottomFrame.Parent = Content
-    
-    local BtnLayout = Instance.new("UIListLayout")
-    BtnLayout.FillDirection = Enum.FillDirection.Horizontal
-    BtnLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    BtnLayout.Padding = UDim.new(0, 6)
-    BtnLayout.Parent = BottomFrame
+    -- Control Buttons
+    local ButtonsFrame = Instance.new("Frame")
+    ButtonsFrame.Size = UDim2.new(1, 0, 0, 65)
+    ButtonsFrame.Position = UDim2.new(0, 0, 1, -65)
+    ButtonsFrame.BackgroundTransparency = 1
+    ButtonsFrame.Parent = Content
     
     local StopBtn = Instance.new("TextButton")
-    StopBtn.Size = UDim2.new(0.48, 0, 1, 0)
+    StopBtn.Size = UDim2.new(0.48, 0, 0, 28)
+    StopBtn.Position = UDim2.new(0, 0, 0, 0)
     StopBtn.BackgroundColor3 = Color3.fromRGB(239, 68, 68)
-    StopBtn.Text = "Stop"
+    StopBtn.BorderSizePixel = 0
+    StopBtn.Text = "Stop Follow"
     StopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     StopBtn.TextSize = 11
     StopBtn.Font = Enum.Font.GothamMedium
-    StopBtn.Parent = BottomFrame
+    StopBtn.Parent = ButtonsFrame
     
     local StopCorner = Instance.new("UICorner")
     StopCorner.CornerRadius = UDim.new(0, 6)
     StopCorner.Parent = StopBtn
     
     local RefreshBtn = Instance.new("TextButton")
-    RefreshBtn.Size = UDim2.new(0.48, 0, 1, 0)
+    RefreshBtn.Size = UDim2.new(0.48, 0, 0, 28)
+    RefreshBtn.Position = UDim2.new(0.52, 0, 0, 0)
     RefreshBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-    RefreshBtn.Text = "Refresh"
+    RefreshBtn.BorderSizePixel = 0
+    RefreshBtn.Text = "Refresh List"
     RefreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     RefreshBtn.TextSize = 11
     RefreshBtn.Font = Enum.Font.GothamMedium
-    RefreshBtn.Parent = BottomFrame
+    RefreshBtn.Parent = ButtonsFrame
     
     local RefreshCorner = Instance.new("UICorner")
     RefreshCorner.CornerRadius = UDim.new(0, 6)
     RefreshCorner.Parent = RefreshBtn
     
-    -- Update Players
-    local function UpdatePlayerList(query)
-        query = query or ""
-        query = query:lower()
-        
+    -- Distance Slider (untuk adjust jarak follow)
+    local SliderFrame = Instance.new("Frame")
+    SliderFrame.Size = UDim2.new(1, 0, 0, 28)
+    SliderFrame.Position = UDim2.new(0, 0, 0, 33)
+    SliderFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
+    SliderFrame.BorderSizePixel = 0
+    SliderFrame.Parent = ButtonsFrame
+    
+    local SliderCorner = Instance.new("UICorner")
+    SliderCorner.CornerRadius = UDim.new(0, 6)
+    SliderCorner.Parent = SliderFrame
+    
+    local SliderLabel = Instance.new("TextLabel")
+    SliderLabel.Size = UDim2.new(0, 60, 1, 0)
+    SliderLabel.Position = UDim2.new(0, 8, 0, 0)
+    SliderLabel.BackgroundTransparency = 1
+    SliderLabel.Text = "Distance:"
+    SliderLabel.TextColor3 = Color3.fromRGB(130, 130, 145)
+    SliderLabel.TextSize = 10
+    SliderLabel.Font = Enum.Font.GothamMedium
+    SliderLabel.TextXAlignment = Enum.TextXAlignment.Left
+    SliderLabel.Parent = SliderFrame
+    
+    local SliderValue = Instance.new("TextLabel")
+    SliderValue.Size = UDim2.new(0, 40, 1, 0)
+    SliderValue.Position = UDim2.new(1, -45, 0, 0)
+    SliderValue.BackgroundTransparency = 1
+    SliderValue.Text = "0"
+    SliderValue.TextColor3 = Color3.fromRGB(0, 230, 118)
+    SliderValue.TextSize = 10
+    SliderValue.Font = Enum.Font.GothamBold
+    SliderValue.Parent = SliderFrame
+    
+    local SliderBar = Instance.new("Frame")
+    SliderBar.Size = UDim2.new(0, 120, 0, 4)
+    SliderBar.Position = UDim2.new(0, 68, 0.5, -2)
+    SliderBar.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
+    SliderBar.BorderSizePixel = 0
+    SliderBar.Parent = SliderFrame
+    
+    local SliderBarCorner = Instance.new("UICorner")
+    SliderBarCorner.CornerRadius = UDim.new(1, 0)
+    SliderBarCorner.Parent = SliderBar
+    
+    local SliderKnob = Instance.new("Frame")
+    SliderKnob.Size = UDim2.new(0, 12, 0, 12)
+    SliderKnob.Position = UDim2.new(0, -6, 0.5, -6)
+    SliderKnob.BackgroundColor3 = Color3.fromRGB(0, 230, 118)
+    SliderKnob.BorderSizePixel = 0
+    SliderKnob.Parent = SliderBar
+    
+    local SliderKnobCorner = Instance.new("UICorner")
+    SliderKnobCorner.CornerRadius = UDim.new(1, 0)
+    SliderKnobCorner.Parent = SliderKnob
+    
+    -- Slider functionality
+    local draggingSlider = false
+    local SliderButton = Instance.new("TextButton")
+    SliderButton.Size = UDim2.new(1, 20, 1, 20)
+    SliderButton.Position = UDim2.new(0, -10, 0, -10)
+    SliderButton.BackgroundTransparency = 1
+    SliderButton.Text = ""
+    SliderButton.Parent = SliderKnob
+    
+    SliderButton.MouseButton1Down:Connect(function()
+        draggingSlider = true
+    end)
+    
+    game:GetService("UserInputService").InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            draggingSlider = false
+        end
+    end)
+    
+    SliderButton.MouseMoved:Connect(function(x, y)
+        if draggingSlider then
+            local relativeX = x - SliderBar.AbsolutePosition.X
+            local percentage = math.clamp(relativeX / SliderBar.AbsoluteSize.X, 0, 1)
+            
+            SliderKnob.Position = UDim2.new(percentage, -6, 0.5, -6)
+            
+            local distance = math.floor(percentage * 5 * 10) / 10 -- 0 to 5 studs
+            Config.FollowDistance = distance
+            SliderValue.Text = tostring(distance)
+        end
+    end)
+    
+    -- Update Player List Function
+    local function UpdatePlayerList(searchQuery)
         pcall(function()
+            searchQuery = searchQuery or ""
+            searchQuery = searchQuery:lower()
+            
             for _, child in pairs(ScrollFrame:GetChildren()) do
                 if child:IsA("Frame") then
                     child:Destroy()
                 end
             end
             
-            local players = GetAllPlayersWithDistance()
+            local playerData = GetAllPlayersWithDistance()
             
-            if #players == 0 then
-                local EmptyLabel = Instance.new("TextLabel")
-                EmptyLabel.Size = UDim2.new(1, 0, 0, 30)
-                EmptyLabel.BackgroundTransparency = 1
-                EmptyLabel.Text = "No players"
-                EmptyLabel.TextColor3 = Color3.fromRGB(120, 120, 130)
-                EmptyLabel.TextSize = 11
-                EmptyLabel.Font = Enum.Font.Gotham
-                EmptyLabel.Parent = ScrollFrame
-            else
-                for i, data in ipairs(players) do
-                    local player = data.Player
-                    local dist = data.Distance
+            for index, data in ipairs(playerData) do
+                local player = data.Player
+                local dist = data.Distance
+                
+                if searchQuery == "" or player.Name:lower():find(searchQuery) or player.DisplayName:lower():find(searchQuery) then
+                    local Card = Instance.new("Frame")
+                    Card.Size = UDim2.new(1, -6, 0, 44)
+                    Card.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
+                    Card.BorderSizePixel = 0
+                    Card.Parent = ScrollFrame
                     
-                    if query == "" or player.Name:lower():find(query) then
-                        local Card = Instance.new("Frame")
-                        Card.Size = UDim2.new(1, -12, 0, 42)
-                        Card.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
-                        Card.BorderSizePixel = 0
-                        Card.LayoutOrder = i
-                        Card.Parent = ScrollFrame
+                    local CardCorner = Instance.new("UICorner")
+                    CardCorner.CornerRadius = UDim.new(0, 6)
+                    CardCorner.Parent = Card
+                    
+                    local Btn = Instance.new("TextButton")
+                    Btn.Size = UDim2.new(1, 0, 1, 0)
+                    Btn.BackgroundTransparency = 1
+                    Btn.Text = ""
+                    Btn.Parent = Card
+                    
+                    local Avatar = Instance.new("Frame")
+                    Avatar.Size = UDim2.new(0, 30, 0, 30)
+                    Avatar.Position = UDim2.new(0, 7, 0.5, -15)
+                    Avatar.BackgroundColor3 = Color3.fromRGB(0, 230, 118)
+                    Avatar.BorderSizePixel = 0
+                    Avatar.Parent = Card
+                    
+                    local AvatarCorner = Instance.new("UICorner")
+                    AvatarCorner.CornerRadius = UDim.new(0, 6)
+                    AvatarCorner.Parent = Avatar
+                    
+                    local AvatarText = Instance.new("TextLabel")
+                    AvatarText.Size = UDim2.new(1, 0, 1, 0)
+                    AvatarText.BackgroundTransparency = 1
+                    AvatarText.Text = player.Name:sub(1, 2):upper()
+                    AvatarText.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    AvatarText.TextSize = 13
+                    AvatarText.Font = Enum.Font.GothamBold
+                    AvatarText.Parent = Avatar
+                    
+                    local NameLabel = Instance.new("TextLabel")
+                    NameLabel.Size = UDim2.new(1, -100, 0, 16)
+                    NameLabel.Position = UDim2.new(0, 42, 0, 8)
+                    NameLabel.BackgroundTransparency = 1
+                    NameLabel.Text = player.Name
+                    NameLabel.TextColor3 = Color3.fromRGB(220, 220, 230)
+                    NameLabel.TextSize = 11
+                    NameLabel.Font = Enum.Font.GothamMedium
+                    NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    NameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+                    NameLabel.Parent = Card
+                    
+                    local DistLabel = Instance.new("TextLabel")
+                    DistLabel.Size = UDim2.new(1, -100, 0, 14)
+                    DistLabel.Position = UDim2.new(0, 42, 0, 22)
+                    DistLabel.BackgroundTransparency = 1
+                    DistLabel.Text = dist .. " studs"
+                    DistLabel.TextColor3 = Color3.fromRGB(130, 130, 145)
+                    DistLabel.TextSize = 9
+                    DistLabel.Font = Enum.Font.Gotham
+                    DistLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    DistLabel.Parent = Card
+                    
+                    local Indicator = Instance.new("Frame")
+                    Indicator.Name = "Indicator"
+                    Indicator.Size = UDim2.new(0, 3, 1, -8)
+                    Indicator.Position = UDim2.new(1, -6, 0, 4)
+                    Indicator.BackgroundColor3 = Color3.fromRGB(0, 230, 118)
+                    Indicator.BorderSizePixel = 0
+                    Indicator.Visible = false
+                    Indicator.Parent = Card
+                    
+                    local IndCorner = Instance.new("UICorner")
+                    IndCorner.CornerRadius = UDim.new(1, 0)
+                    IndCorner.Parent = Indicator
+                    
+                    Btn.MouseEnter:Connect(function()
+                        if Config.TargetPlayer ~= player then
+                            Card.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+                        end
+                    end)
+                    
+                    Btn.MouseLeave:Connect(function()
+                        if Config.TargetPlayer ~= player then
+                            Card.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
+                        end
+                    end)
+                    
+                    Btn.MouseButton1Click:Connect(function()
+                        Config.TargetPlayer = player
+                        Config.CarryEnabled = true
                         
-                        local CardCorner = Instance.new("UICorner")
-                        CardCorner.CornerRadius = UDim.new(0, 5)
-                        CardCorner.Parent = Card
+                        StatusText.Text = "Following " .. player.Name
+                        StatusDot.BackgroundColor3 = Color3.fromRGB(0, 230, 118)
                         
-                        local Btn = Instance.new("TextButton")
-                        Btn.Size = UDim2.new(1, 0, 1, 0)
-                        Btn.BackgroundTransparency = 1
-                        Btn.Text = ""
-                        Btn.Parent = Card
-                        
-                        local Avatar = Instance.new("Frame")
-                        Avatar.Size = UDim2.new(0, 30, 0, 30)
-                        Avatar.Position = UDim2.new(0, 6, 0.5, -15)
-                        Avatar.BackgroundColor3 = Color3.fromRGB(0, 230, 118)
-                        Avatar.BorderSizePixel = 0
-                        Avatar.Parent = Card
-                        
-                        local AvatarCorner = Instance.new("UICorner")
-                        AvatarCorner.CornerRadius = UDim.new(1, 0)
-                        AvatarCorner.Parent = Avatar
-                        
-                        local AvatarText = Instance.new("TextLabel")
-                        AvatarText.Size = UDim2.new(1, 0, 1, 0)
-                        AvatarText.BackgroundTransparency = 1
-                        AvatarText.Text = player.Name:sub(1, 2):upper()
-                        AvatarText.TextColor3 = Color3.fromRGB(255, 255, 255)
-                        AvatarText.TextSize = 13
-                        AvatarText.Font = Enum.Font.GothamBold
-                        AvatarText.Parent = Avatar
-                        
-                        local NameLabel = Instance.new("TextLabel")
-                        NameLabel.Size = UDim2.new(1, -100, 0, 16)
-                        NameLabel.Position = UDim2.new(0, 42, 0, 8)
-                        NameLabel.BackgroundTransparency = 1
-                        NameLabel.Text = player.Name
-                        NameLabel.TextColor3 = Color3.fromRGB(220, 220, 230)
-                        NameLabel.TextSize = 11
-                        NameLabel.Font = Enum.Font.GothamMedium
-                        NameLabel.TextXAlignment = Enum.TextXAlignment.Left
-                        NameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-                        NameLabel.Parent = Card
-                        
-                        local DistLabel = Instance.new("TextLabel")
-                        DistLabel.Size = UDim2.new(1, -100, 0, 14)
-                        DistLabel.Position = UDim2.new(0, 42, 0, 22)
-                        DistLabel.BackgroundTransparency = 1
-                        DistLabel.Text = dist .. " studs"
-                        DistLabel.TextColor3 = Color3.fromRGB(130, 130, 145)
-                        DistLabel.TextSize = 9
-                        DistLabel.Font = Enum.Font.Gotham
-                        DistLabel.TextXAlignment = Enum.TextXAlignment.Left
-                        DistLabel.Parent = Card
-                        
-                        local Indicator = Instance.new("Frame")
-                        Indicator.Name = "Indicator"
-                        Indicator.Size = UDim2.new(0, 3, 1, -8)
-                        Indicator.Position = UDim2.new(1, -6, 0, 4)
-                        Indicator.BackgroundColor3 = Color3.fromRGB(0, 230, 118)
-                        Indicator.BorderSizePixel = 0
-                        Indicator.Visible = false
-                        Indicator.Parent = Card
-                        
-                        local IndCorner = Instance.new("UICorner")
-                        IndCorner.CornerRadius = UDim.new(1, 0)
-                        IndCorner.Parent = Indicator
-                        
-                        Btn.MouseEnter:Connect(function()
-                            if Config.TargetPlayer ~= player then
-                                Card.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+                        for _, c in pairs(ScrollFrame:GetChildren()) do
+                            if c:IsA("Frame") and c:FindFirstChild("Indicator") then
+                                c.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
+                                c.Indicator.Visible = false
                             end
-                        end)
+                        end
                         
-                        Btn.MouseLeave:Connect(function()
-                            if Config.TargetPlayer ~= player then
-                                Card.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
-                            end
-                        end)
-                        
-                        Btn.MouseButton1Click:Connect(function()
-                            Config.TargetPlayer = player
-                            Config.CarryEnabled = true
-                            
-                            StatusText.Text = "Following " .. player.Name
-                            StatusDot.BackgroundColor3 = Color3.fromRGB(0, 230, 118)
-                            
-                            if Config.InvisibleMode then
-                                MakeInvisible()
-                            end
-                            
-                            for _, c in pairs(ScrollFrame:GetChildren()) do
-                                if c:IsA("Frame") and c:FindFirstChild("Indicator") then
-                                    c.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
-                                    c.Indicator.Visible = false
-                                end
-                            end
-                            
-                            Card.BackgroundColor3 = Color3.fromRGB(15, 65, 40)
-                            Indicator.Visible = true
-                        end)
-                    end
+                        Card.BackgroundColor3 = Color3.fromRGB(15, 65, 40)
+                        Indicator.Visible = true
+                    end)
                 end
             end
             
@@ -551,7 +608,6 @@ local function CreateGUI()
     
     CloseBtn.MouseButton1Click:Connect(function()
         Config.CarryEnabled = false
-        MakeVisible()
         ScreenGui:Destroy()
     end)
     
@@ -560,8 +616,6 @@ local function CreateGUI()
         Config.TargetPlayer = nil
         StatusText.Text = "Idle"
         StatusDot.BackgroundColor3 = Color3.fromRGB(239, 68, 68)
-        
-        MakeVisible()
         
         for _, c in pairs(ScrollFrame:GetChildren()) do
             if c:IsA("Frame") and c:FindFirstChild("Indicator") then
@@ -634,16 +688,13 @@ end)
 
 LocalPlayer.CharacterAdded:Connect(function(char)
     wait(0.5)
-    if Config.CarryEnabled then
-        MakeInvisible()
-    end
+    -- Tidak ada invisible mode lagi
 end)
 
 Players.PlayerRemoving:Connect(function(player)
     if Config.TargetPlayer == player then
         Config.CarryEnabled = false
         Config.TargetPlayer = nil
-        MakeVisible()
     end
 end)
 
@@ -651,5 +702,7 @@ wait(0.5)
 CreateGUI()
 
 print("━━━━━━━━━━━━━━━━━━━━━━━━")
-print("✓ Warpah Carry Loaded")
+print("✓ Warpah Carry Fixed - Loaded")
+print("✓ Invisible mode removed")
+print("✓ Better positioning system")
 print("━━━━━━━━━━━━━━━━━━━━━━━━")
