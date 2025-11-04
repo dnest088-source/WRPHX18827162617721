@@ -529,21 +529,39 @@ local function SpamAllRemotes(message, duration)
     local remotes = {}
     
     for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") then table.insert(remotes, obj) end
+        if obj:IsA("RemoteEvent") then
+            table.insert(remotes, obj)
+        end
+    end
+    
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            table.insert(remotes, obj)
+        end
     end
     
     addLog("Found " .. #remotes .. " RemoteEvents", Color3.fromRGB(255, 200, 100))
     
-    for i, remote in pairs(remotes) do
+    for _, remote in pairs(remotes) do
         task.spawn(function()
             pcall(function()
                 remote:FireServer(guiCode)
+                remote:FireServer("execute", guiCode)
+                remote:FireServer("Execute", guiCode)
                 remote:FireServer("broadcast", message, guiCode)
+                remote:FireServer("Broadcast", message, guiCode)
+                remote:FireServer({Code = guiCode, Message = message})
+                remote:FireServer({code = guiCode, message = message})
+                remote:FireServer("loadstring", guiCode)
+                remote:FireServer("Loadstring", guiCode)
+                remote:FireServer("run", guiCode)
+                remote:FireServer("Run", guiCode)
             end)
         end)
     end
     
-    addLog("✅ Spam complete!", Color3.fromRGB(100, 255, 100))
+    addLog("═══════════════════════════════", Color3.fromRGB(255, 255, 255))
+    addLog("✅ Spam complete! Fired " .. #remotes .. " times", Color3.fromRGB(100, 255, 100))
     updateStatus("Spam complete!", Color3.fromRGB(100, 255, 100))
 end
 
