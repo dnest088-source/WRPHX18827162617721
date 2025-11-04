@@ -1,4 +1,4 @@
--- Script Broadcast Backdoor Exploit - Compact Version
+-- Script Broadcast Backdoor Exploit - Modern Design V2
 -- Compatible dengan Delta Executor
 
 local Players = game:GetService("Players")
@@ -7,24 +7,381 @@ local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
-print("=== BACKDOOR WARPAH EXPLOIT ===")
-print("Mencari backdoor dan vulnerability...")
+print("\n╔═══════════════════════════════════════╗")
+print("║   BACKDOOR EXPLOIT V2 - LOADING...    ║")
+print("╚═══════════════════════════════════════╝\n")
 
 -- Daftar nama backdoor yang umum
 local BACKDOOR_NAMES = {
     "MainModule", "Loader", "ModuleLoader", "Core", "MainCore",
     "HD Admin", "Padministratior", "Kohl", "PersonalServerAdmin",
     "VanGui", "Epix", "Clone", "Anti", "GamePass", "Model",
-    "Script", "LocalScript", "ScreenGui", "RemoteFunction", "RemoteEvent",
     "Handler", "Cmd", "Owner", "Admin", "Ban", "Kick", "Kill"
 }
 
--- Fungsi untuk mencari backdoor
+-- Hapus GUI lama
+if LocalPlayer.PlayerGui:FindFirstChild("BackdoorExploitGUI") then
+    LocalPlayer.PlayerGui:FindFirstChild("BackdoorExploitGUI"):Destroy()
+    wait(0.1)
+end
+
+-- Buat ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "BackdoorExploitGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = LocalPlayer.PlayerGui
+
+-- Main Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 450, 0, 550)
+MainFrame.Position = UDim2.new(0.5, -225, 0.5, -275)
+MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 15)
+MainCorner.Parent = MainFrame
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(255, 50, 100)
+MainStroke.Thickness = 3
+MainStroke.Parent = MainFrame
+
+-- Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 55)
+TitleBar.BackgroundColor3 = Color3.fromRGB(220, 50, 80)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 15)
+TitleCorner.Parent = TitleBar
+
+local TitleGradient = Instance.new("UIGradient")
+TitleGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(220, 50, 80)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 30, 60))
+}
+TitleGradient.Rotation = 90
+TitleGradient.Parent = TitleBar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -140, 1, 0)
+Title.Position = UDim2.new(0, 15, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "🔥 BACKDOOR EXPLOIT"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 22
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.TextStrokeTransparency = 0.5
+Title.Parent = TitleBar
+
+local Subtitle = Instance.new("TextLabel")
+Subtitle.Size = UDim2.new(1, -140, 0, 18)
+Subtitle.Position = UDim2.new(0, 15, 1, -22)
+Subtitle.BackgroundTransparency = 1
+Subtitle.Text = "Warpah Injection System v2.0"
+Subtitle.TextColor3 = Color3.fromRGB(255, 200, 200)
+Subtitle.TextSize = 11
+Subtitle.Font = Enum.Font.Gotham
+Subtitle.TextXAlignment = Enum.TextXAlignment.Left
+Subtitle.Parent = TitleBar
+
+-- Broadcast Button (di title bar)
+local BroadcastButton = Instance.new("TextButton")
+BroadcastButton.Size = UDim2.new(0, 120, 0, 40)
+BroadcastButton.Position = UDim2.new(1, -127, 0, 7)
+BroadcastButton.BackgroundColor3 = Color3.fromRGB(40, 180, 80)
+BroadcastButton.Text = "📢 BROADCAST"
+BroadcastButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+BroadcastButton.TextSize = 14
+BroadcastButton.Font = Enum.Font.GothamBold
+BroadcastButton.BorderSizePixel = 0
+BroadcastButton.TextStrokeTransparency = 0.5
+BroadcastButton.Parent = TitleBar
+
+local BroadcastCorner = Instance.new("UICorner")
+BroadcastCorner.CornerRadius = UDim.new(0, 10)
+BroadcastCorner.Parent = BroadcastButton
+
+local BroadcastStroke = Instance.new("UIStroke")
+BroadcastStroke.Color = Color3.fromRGB(80, 220, 120)
+BroadcastStroke.Thickness = 2
+BroadcastStroke.Parent = BroadcastButton
+
+-- Status Bar
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, -30, 0, 35)
+StatusLabel.Position = UDim2.new(0, 15, 0, 65)
+StatusLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+StatusLabel.Text = "🟢 Ready - Waiting for command"
+StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+StatusLabel.TextSize = 12
+StatusLabel.Font = Enum.Font.GothamBold
+StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+StatusLabel.BorderSizePixel = 0
+StatusLabel.Parent = MainFrame
+
+local StatusCorner = Instance.new("UICorner")
+StatusCorner.CornerRadius = UDim.new(0, 8)
+StatusCorner.Parent = StatusLabel
+
+local StatusPadding = Instance.new("UIPadding")
+StatusPadding.PaddingLeft = UDim.new(0, 10)
+StatusPadding.Parent = StatusLabel
+
+-- Log Box (ScrollingFrame)
+local LogFrame = Instance.new("ScrollingFrame")
+LogFrame.Size = UDim2.new(1, -30, 0, 180)
+LogFrame.Position = UDim2.new(0, 15, 0, 110)
+LogFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
+LogFrame.BorderSizePixel = 0
+LogFrame.ScrollBarThickness = 6
+LogFrame.ScrollBarImageColor3 = Color3.fromRGB(255, 50, 100)
+LogFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+LogFrame.Parent = MainFrame
+
+local LogCorner = Instance.new("UICorner")
+LogCorner.CornerRadius = UDim.new(0, 10)
+LogCorner.Parent = LogFrame
+
+local LogStroke = Instance.new("UIStroke")
+LogStroke.Color = Color3.fromRGB(40, 40, 50)
+LogStroke.Thickness = 1
+LogStroke.Parent = LogFrame
+
+local LogText = Instance.new("TextLabel")
+LogText.Size = UDim2.new(1, -15, 1, 0)
+LogText.Position = UDim2.new(0, 8, 0, 5)
+LogText.BackgroundTransparency = 1
+LogText.Text = "🔍 System initialized\n📊 Waiting for scan...\n"
+LogText.TextColor3 = Color3.fromRGB(150, 255, 150)
+LogText.TextSize = 10
+LogText.Font = Enum.Font.Code
+LogText.TextXAlignment = Enum.TextXAlignment.Left
+LogText.TextYAlignment = Enum.TextYAlignment.Top
+LogText.TextWrapped = true
+LogText.RichText = true
+LogText.Parent = LogFrame
+
+-- Message Input Section
+local InputLabel = Instance.new("TextLabel")
+InputLabel.Size = UDim2.new(1, -30, 0, 22)
+InputLabel.Position = UDim2.new(0, 15, 0, 300)
+InputLabel.BackgroundTransparency = 1
+InputLabel.Text = "📝 BROADCAST MESSAGE:"
+InputLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+InputLabel.TextSize = 13
+InputLabel.Font = Enum.Font.GothamBold
+InputLabel.TextXAlignment = Enum.TextXAlignment.Left
+InputLabel.Parent = MainFrame
+
+local MessageBox = Instance.new("TextBox")
+MessageBox.Size = UDim2.new(1, -30, 0, 70)
+MessageBox.Position = UDim2.new(0, 15, 0, 327)
+MessageBox.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+MessageBox.BorderSizePixel = 0
+MessageBox.Text = ""
+MessageBox.PlaceholderText = "Type your broadcast message here..."
+MessageBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
+MessageBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+MessageBox.TextSize = 13
+MessageBox.Font = Enum.Font.Gotham
+MessageBox.TextWrapped = true
+MessageBox.MultiLine = true
+MessageBox.ClearTextOnFocus = false
+MessageBox.TextXAlignment = Enum.TextXAlignment.Left
+MessageBox.TextYAlignment = Enum.TextYAlignment.Top
+MessageBox.Parent = MainFrame
+
+local MsgCorner = Instance.new("UICorner")
+MsgCorner.CornerRadius = UDim.new(0, 8)
+MsgCorner.Parent = MessageBox
+
+local MsgStroke = Instance.new("UIStroke")
+MsgStroke.Color = Color3.fromRGB(255, 50, 100)
+MsgStroke.Thickness = 1
+MsgStroke.Parent = MessageBox
+
+local MsgPadding = Instance.new("UIPadding")
+MsgPadding.PaddingLeft = UDim.new(0, 8)
+MsgPadding.PaddingTop = UDim.new(0, 8)
+MsgPadding.PaddingRight = UDim.new(0, 8)
+MsgPadding.Parent = MessageBox
+
+-- Buttons Container
+local ButtonsFrame = Instance.new("Frame")
+ButtonsFrame.Size = UDim2.new(1, -30, 0, 120)
+ButtonsFrame.Position = UDim2.new(0, 15, 0, 410)
+ButtonsFrame.BackgroundTransparency = 1
+ButtonsFrame.Parent = MainFrame
+
+-- Variables
+local logContent = ""
+
+-- Functions
+local function addLog(text, color)
+    local timestamp = os.date("%H:%M:%S")
+    local colorCode = color or Color3.fromRGB(200, 200, 200)
+    
+    local r, g, b = math.floor(colorCode.R * 255), math.floor(colorCode.G * 255), math.floor(colorCode.B * 255)
+    local colorTag = string.format('<font color="rgb(%d,%d,%d)">', r, g, b)
+    
+    logContent = logContent .. colorTag .. "[" .. timestamp .. "] " .. text .. "</font>\n"
+    LogText.Text = logContent
+    
+    LogFrame.CanvasSize = UDim2.new(0, 0, 0, LogText.TextBounds.Y + 20)
+    LogFrame.CanvasPosition = Vector2.new(0, LogFrame.CanvasSize.Y.Offset)
+    
+    print("[BACKDOOR] " .. text)
+end
+
+local function updateStatus(text, color)
+    StatusLabel.Text = "📊 " .. text
+    StatusLabel.TextColor3 = color or Color3.fromRGB(200, 200, 200)
+end
+
+local function notify(title, text)
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = title;
+            Text = text;
+            Duration = 3;
+        })
+    end)
+end
+
+-- Fungsi untuk menemukan Broadcast Remote asli game
+local function FindGameBroadcastRemote()
+    addLog("🔍 Searching for game's broadcast system...", Color3.fromRGB(100, 200, 255))
+    
+    local broadcastRemotes = {}
+    local searchLocations = {ReplicatedStorage, Workspace, game.Lighting}
+    
+    for _, location in pairs(searchLocations) do
+        pcall(function()
+            for _, obj in pairs(location:GetDescendants()) do
+                local name = string.lower(obj.Name)
+                
+                if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                    if string.find(name, "broadcast") or 
+                       string.find(name, "announce") or 
+                       string.find(name, "message") or
+                       string.find(name, "notification") or
+                       string.find(name, "hint") or
+                       string.find(name, "alert") then
+                        table.insert(broadcastRemotes, obj)
+                        addLog("✓ Found: " .. obj.Name .. " (" .. obj.ClassName .. ")", Color3.fromRGB(100, 255, 100))
+                    end
+                end
+            end
+        end)
+    end
+    
+    addLog("Total broadcast remotes: " .. #broadcastRemotes, Color3.fromRGB(255, 200, 100))
+    return broadcastRemotes
+end
+
+-- Fungsi untuk broadcast menggunakan sistem game
+local function GameBroadcast(message)
+    if not message or message == "" then
+        addLog("❌ Message is empty!", Color3.fromRGB(255, 100, 100))
+        updateStatus("Error: Empty message", Color3.fromRGB(255, 100, 100))
+        notify("Error", "Please enter a message!")
+        return false
+    end
+    
+    addLog("═══════════════════════════════", Color3.fromRGB(255, 255, 255))
+    addLog("📢 GAME BROADCAST STARTING...", Color3.fromRGB(100, 255, 255))
+    updateStatus("Broadcasting via game system...", Color3.fromRGB(100, 200, 255))
+    
+    local remotes = FindGameBroadcastRemote()
+    local successCount = 0
+    
+    if #remotes == 0 then
+        addLog("⚠️ No broadcast remotes found!", Color3.fromRGB(255, 200, 100))
+        addLog("Trying alternative methods...", Color3.fromRGB(255, 255, 100))
+    end
+    
+    -- Fire all found broadcast remotes
+    for _, remote in pairs(remotes) do
+        pcall(function()
+            if remote:IsA("RemoteEvent") then
+                remote:FireServer(message)
+                remote:FireServer("broadcast", message)
+                remote:FireServer("Broadcast", message)
+                remote:FireServer({Message = message})
+                remote:FireServer({message = message})
+                remote:FireServer({Text = message})
+                addLog("🔥 Fired: " .. remote.Name, Color3.fromRGB(255, 150, 100))
+                successCount = successCount + 1
+            elseif remote:IsA("RemoteFunction") then
+                remote:InvokeServer(message)
+                remote:InvokeServer("broadcast", message)
+                addLog("⚡ Invoked: " .. remote.Name, Color3.fromRGB(150, 255, 255))
+                successCount = successCount + 1
+            end
+        end)
+        wait(0.05)
+    end
+    
+    -- Try common broadcast patterns
+    local commonNames = {"BroadcastMessage", "SendMessage", "Announce", "Notification", "ServerMessage"}
+    
+    for _, name in pairs(commonNames) do
+        pcall(function()
+            local remote = ReplicatedStorage:FindFirstChild(name, true)
+            if remote and (remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction")) then
+                if remote:IsA("RemoteEvent") then
+                    remote:FireServer(message)
+                    addLog("🎯 Pattern: " .. name, Color3.fromRGB(255, 200, 100))
+                    successCount = successCount + 1
+                end
+            end
+        end)
+    end
+    
+    -- Try chat system
+    pcall(function()
+        local chatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+        if chatEvents then
+            local sayRequest = chatEvents:FindFirstChild("SayMessageRequest")
+            if sayRequest then
+                sayRequest:FireServer("/broadcast " .. message, "All")
+                sayRequest:FireServer("/m " .. message, "All")
+                addLog("💬 Chat injection attempted", Color3.fromRGB(200, 150, 255))
+                successCount = successCount + 1
+            end
+        end
+    end)
+    
+    addLog("═══════════════════════════════", Color3.fromRGB(255, 255, 255))
+    
+    if successCount > 0 then
+        addLog("✅ Broadcast sent via " .. successCount .. " methods!", Color3.fromRGB(100, 255, 100))
+        updateStatus("Broadcast sent successfully!", Color3.fromRGB(100, 255, 100))
+        notify("Success!", "Broadcast sent!")
+        return true
+    else
+        addLog("❌ No valid broadcast system found", Color3.fromRGB(255, 100, 100))
+        updateStatus("Failed - Try other methods", Color3.fromRGB(255, 100, 100))
+        notify("Failed", "No broadcast system found")
+        return false
+    end
+end
+
+-- Backdoor Functions
 local function FindBackdoors()
     local backdoors = {}
-    local searchLocations = {ReplicatedStorage, Workspace, game.Lighting, game.ServerScriptService}
+    local searchLocations = {ReplicatedStorage, Workspace, game.Lighting}
     
-    print("[SCAN] Scanning untuk backdoor...")
+    addLog("🔍 Starting backdoor scan...", Color3.fromRGB(100, 200, 255))
     
     for _, location in pairs(searchLocations) do
         pcall(function()
@@ -33,7 +390,7 @@ local function FindBackdoors()
                     for _, name in pairs(BACKDOOR_NAMES) do
                         if string.find(string.lower(obj.Name), string.lower(name)) then
                             table.insert(backdoors, {Type = "Module", Object = obj})
-                            print("[BACKDOOR FOUND] Module: " .. obj:GetFullName())
+                            addLog("✓ Module: " .. obj.Name, Color3.fromRGB(255, 200, 100))
                         end
                     end
                 end
@@ -43,83 +400,44 @@ local function FindBackdoors()
                     if string.find(name, "admin") or string.find(name, "owner") or 
                        string.find(name, "remote") or string.find(name, "command") then
                         table.insert(backdoors, {Type = "Remote", Object = obj})
-                        print("[BACKDOOR FOUND] Remote: " .. obj:GetFullName())
+                        addLog("✓ Remote: " .. obj.Name, Color3.fromRGB(255, 150, 255))
                     end
                 end
                 
                 if obj:IsA("RemoteFunction") then
                     table.insert(backdoors, {Type = "Function", Object = obj})
-                    print("[BACKDOOR FOUND] Function: " .. obj:GetFullName())
+                    addLog("✓ Function: " .. obj.Name, Color3.fromRGB(150, 255, 255))
                 end
             end
         end)
     end
     
-    print("[SCAN] Total backdoor ditemukan: " .. #backdoors)
+    addLog("═══════════════════════════════", Color3.fromRGB(255, 255, 255))
+    addLog("Total found: " .. #backdoors .. " backdoors", Color3.fromRGB(100, 255, 100))
+    
     return backdoors
 end
 
--- Fungsi untuk exploit ModuleScript backdoor
-local function ExploitModuleBackdoor(module, code)
-    pcall(function()
-        local req = require(module)
-        if type(req) == "function" then
-            req(code)
-            print("[EXPLOIT] Module executed: " .. module.Name)
-        elseif type(req) == "table" then
-            if req.run then req.run(code) end
-            if req.Run then req.Run(code) end
-            if req.Execute then req.Execute(code) end
-            if req.execute then req.execute(code) end
-            if req.Loadstring then req.Loadstring(code) end
-            if req.loadstring then req.loadstring(code) end
-        end
-    end)
-end
-
--- Fungsi untuk exploit RemoteEvent backdoor
-local function ExploitRemoteBackdoor(remote, ...)
-    local args = {...}
-    pcall(function()
-        remote:FireServer(unpack(args))
-        remote:FireServer("Broadcast", unpack(args))
-        remote:FireServer("broadcast", unpack(args))
-        remote:FireServer("Execute", unpack(args))
-        remote:FireServer("execute", unpack(args))
-        remote:FireServer("Command", unpack(args))
-        remote:FireServer("command", unpack(args))
-        print("[EXPLOIT] Remote fired: " .. remote.Name)
-    end)
-end
-
--- Fungsi untuk membuat GUI broadcast
 local function GetBroadcastGUICode(message, duration)
     return string.format([[
         local Players = game:GetService("Players")
         local TweenService = game:GetService("TweenService")
-        
         for _, player in pairs(Players:GetPlayers()) do
             spawn(function()
                 pcall(function()
                     local playerGui = player:WaitForChild("PlayerGui")
-                    
                     local oldGui = playerGui:FindFirstChild("BackdoorBroadcast")
                     if oldGui then oldGui:Destroy() end
-                    
                     local screenGui = Instance.new("ScreenGui")
                     screenGui.Name = "BackdoorBroadcast"
                     screenGui.ResetOnSpawn = false
                     screenGui.DisplayOrder = 999999
-                    screenGui.IgnoreGuiInset = true
                     screenGui.Parent = playerGui
-                    
                     local overlay = Instance.new("Frame")
                     overlay.Size = UDim2.new(1, 0, 1, 0)
                     overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
                     overlay.BackgroundTransparency = 0.7
-                    overlay.BorderSizePixel = 0
                     overlay.Parent = screenGui
-                    
                     local mainFrame = Instance.new("Frame")
                     mainFrame.Size = UDim2.new(0.8, 0, 0.3, 0)
                     mainFrame.Position = UDim2.new(0.1, 0, 0.35, 0)
@@ -127,11 +445,9 @@ local function GetBroadcastGUICode(message, duration)
                     mainFrame.BorderSizePixel = 3
                     mainFrame.BorderColor3 = Color3.fromRGB(255, 50, 50)
                     mainFrame.Parent = screenGui
-                    
                     local corner = Instance.new("UICorner")
                     corner.CornerRadius = UDim.new(0, 15)
                     corner.Parent = mainFrame
-                    
                     local title = Instance.new("TextLabel")
                     title.Size = UDim2.new(1, -40, 0, 60)
                     title.Position = UDim2.new(0, 20, 0, 20)
@@ -140,9 +456,7 @@ local function GetBroadcastGUICode(message, duration)
                     title.TextSize = 36
                     title.Font = Enum.Font.SourceSansBold
                     title.TextColor3 = Color3.fromRGB(255, 50, 50)
-                    title.TextStrokeTransparency = 0.5
                     title.Parent = mainFrame
-                    
                     local messageLabel = Instance.new("TextLabel")
                     messageLabel.Size = UDim2.new(1, -60, 1, -100)
                     messageLabel.Position = UDim2.new(0, 30, 0, 85)
@@ -152,30 +466,8 @@ local function GetBroadcastGUICode(message, duration)
                     messageLabel.Font = Enum.Font.SourceSans
                     messageLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
                     messageLabel.TextWrapped = true
-                    messageLabel.TextYAlignment = Enum.TextYAlignment.Top
                     messageLabel.Parent = mainFrame
-                    
-                    mainFrame.Position = UDim2.new(0.1, 0, -0.5, 0)
-                    TweenService:Create(mainFrame, TweenInfo.new(0.8, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                        Position = UDim2.new(0.1, 0, 0.35, 0)
-                    }):Play()
-                    
-                    spawn(function()
-                        while mainFrame.Parent do
-                            mainFrame.BorderColor3 = Color3.fromRGB(255, 50, 50)
-                            wait(0.5)
-                            mainFrame.BorderColor3 = Color3.fromRGB(255, 255, 255)
-                            wait(0.5)
-                        end
-                    end)
-                    
                     wait(%d)
-                    
-                    TweenService:Create(mainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-                        Position = UDim2.new(0.1, 0, -0.5, 0)
-                    }):Play()
-                    
-                    wait(0.6)
                     screenGui:Destroy()
                 end)
             end)
@@ -183,9 +475,24 @@ local function GetBroadcastGUICode(message, duration)
     ]], message, duration or 10)
 end
 
--- Fungsi utama untuk broadcast via backdoor
+local function ExploitModuleBackdoor(module, code)
+    pcall(function()
+        local req = require(module)
+        if type(req) == "function" then
+            req(code)
+            addLog("🔥 Module executed: " .. module.Name, Color3.fromRGB(255, 150, 50))
+        elseif type(req) == "table" then
+            if req.run then req.run(code) end
+            if req.Execute then req.Execute(code) end
+            addLog("🔥 Table executed: " .. module.Name, Color3.fromRGB(255, 150, 50))
+        end
+    end)
+end
+
 local function BackdoorBroadcast(message, duration)
-    print("[BROADCAST] Mengeksekusi broadcast via backdoor...")
+    addLog("═══════════════════════════════", Color3.fromRGB(255, 255, 255))
+    addLog("💉 BACKDOOR EXPLOIT STARTING...", Color3.fromRGB(255, 100, 100))
+    updateStatus("Exploiting backdoors...", Color3.fromRGB(255, 200, 100))
     
     local backdoors = FindBackdoors()
     local guiCode = GetBroadcastGUICode(message, duration or 10)
@@ -196,331 +503,190 @@ local function BackdoorBroadcast(message, duration)
             ExploitModuleBackdoor(backdoor.Object, guiCode)
             successCount = successCount + 1
         elseif backdoor.Type == "Remote" then
-            ExploitRemoteBackdoor(backdoor.Object, guiCode)
-            ExploitRemoteBackdoor(backdoor.Object, "Broadcast", message)
-            ExploitRemoteBackdoor(backdoor.Object, {Type = "Broadcast", Message = message, Code = guiCode})
-            successCount = successCount + 1
-        elseif backdoor.Type == "Function" then
             pcall(function()
-                backdoor.Object:InvokeServer(guiCode)
-                backdoor.Object:InvokeServer("Broadcast", message)
+                backdoor.Object:FireServer(guiCode)
+                backdoor.Object:FireServer("Broadcast", guiCode)
+                addLog("🔥 Remote fired: " .. backdoor.Object.Name, Color3.fromRGB(255, 100, 150))
             end)
             successCount = successCount + 1
         end
+        wait(0.05)
     end
     
-    print("[BROADCAST] Exploited " .. successCount .. " backdoors!")
+    addLog("═══════════════════════════════", Color3.fromRGB(255, 255, 255))
+    addLog("✅ Exploited " .. successCount .. " backdoors!", Color3.fromRGB(100, 255, 100))
+    updateStatus("Complete!", Color3.fromRGB(100, 255, 100))
+    
     return successCount > 0
 end
 
--- Fungsi untuk spam semua RemoteEvent
 local function SpamAllRemotes(message, duration)
-    print("[SPAM] Firing semua RemoteEvent dengan GUI code...")
+    addLog("═══════════════════════════════", Color3.fromRGB(255, 255, 255))
+    addLog("💥 SPAM MODE ACTIVATED!", Color3.fromRGB(255, 50, 150))
+    updateStatus("Spamming...", Color3.fromRGB(255, 100, 255))
     
     local guiCode = GetBroadcastGUICode(message, duration or 10)
     local remotes = {}
     
     for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") then
-            table.insert(remotes, obj)
-        end
+        if obj:IsA("RemoteEvent") then table.insert(remotes, obj) end
     end
     
-    for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("RemoteEvent") then
-            table.insert(remotes, obj)
-        end
-    end
+    addLog("Found " .. #remotes .. " RemoteEvents", Color3.fromRGB(255, 200, 100))
     
-    print("[SPAM] Found " .. #remotes .. " RemoteEvents")
-    
-    for _, remote in pairs(remotes) do
+    for i, remote in pairs(remotes) do
         task.spawn(function()
             pcall(function()
                 remote:FireServer(guiCode)
-                remote:FireServer("execute", guiCode)
-                remote:FireServer("Execute", guiCode)
                 remote:FireServer("broadcast", message, guiCode)
-                remote:FireServer("Broadcast", message, guiCode)
-                remote:FireServer({Code = guiCode, Message = message})
-                remote:FireServer({code = guiCode, message = message})
-                remote:FireServer("loadstring", guiCode)
-                remote:FireServer("Loadstring", guiCode)
-                remote:FireServer("run", guiCode)
-                remote:FireServer("Run", guiCode)
             end)
         end)
     end
     
-    print("[SPAM] All remotes fired!")
+    addLog("✅ Spam complete!", Color3.fromRGB(100, 255, 100))
+    updateStatus("Spam complete!", Color3.fromRGB(100, 255, 100))
 end
 
--- Fungsi untuk exploit HD Admin
 local function ExploitHDAdmin(message)
-    print("[HD ADMIN] Searching for HD Admin...")
-    
-    local adminRemotes = {}
+    addLog("═══════════════════════════════", Color3.fromRGB(255, 255, 255))
+    addLog("🛡️ HD ADMIN EXPLOIT MODE", Color3.fromRGB(150, 100, 255))
+    updateStatus("HD Admin...", Color3.fromRGB(200, 100, 255))
     
     for _, remote in pairs(ReplicatedStorage:GetDescendants()) do
-        if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
+        if remote:IsA("RemoteEvent") then
             local name = string.lower(remote.Name)
-            if string.find(name, "admin") or string.find(name, "perm") or 
-               string.find(name, "owner") or string.find(name, "command") then
-                table.insert(adminRemotes, remote)
-                print("[FOUND] Admin remote: " .. remote:GetFullName())
+            if string.find(name, "admin") or string.find(name, "command") then
+                pcall(function()
+                    remote:FireServer("Broadcast", message)
+                    remote:FireServer("m", message)
+                    addLog("Fired: " .. remote.Name, Color3.fromRGB(255, 150, 255))
+                end)
             end
         end
     end
     
-    for _, remote in pairs(adminRemotes) do
-        if remote:IsA("RemoteEvent") then
-            pcall(function()
-                remote:FireServer("Broadcast", message)
-                remote:FireServer("broadcast", message)
-                remote:FireServer("m", message)
-                remote:FireServer("h", message)
-                remote:FireServer("announce", message)
-                remote:FireServer({Command = "broadcast", Args = {message}})
-                remote:FireServer({command = "m", args = {message}})
-            end)
-        elseif remote:IsA("RemoteFunction") then
-            pcall(function()
-                remote:InvokeServer("Broadcast", message)
-                remote:InvokeServer("m", message)
-                remote:InvokeServer("h", message)
-            end)
-        end
-    end
-    
-    print("[HD ADMIN] Exploit attempts completed!")
+    addLog("✅ HD Admin complete!", Color3.fromRGB(100, 255, 100))
+    updateStatus("Complete!", Color3.fromRGB(100, 255, 100))
 end
 
--- Fungsi untuk inject via Chat
-local function InjectViaChat(message)
-    print("[CHAT] Trying chat injection...")
+-- Create Buttons
+local function createButton(text, row, col, color, callback)
+    local button = Instance.new("TextButton")
+    local btnWidth = (ButtonsFrame.AbsoluteSize.X - 10) / 2
+    local xPos = col == 1 and 0 or (btnWidth + 10)
+    local yPos = (row - 1) * 42
     
-    local chatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
-    if chatEvents then
-        local sayMessageRequest = chatEvents:FindFirstChild("SayMessageRequest")
-        if sayMessageRequest then
-            pcall(function()
-                sayMessageRequest:FireServer(message, "All")
-                sayMessageRequest:FireServer("/broadcast " .. message, "All")
-                sayMessageRequest:FireServer("/m " .. message, "All")
-                sayMessageRequest:FireServer("/h " .. message, "All")
-                sayMessageRequest:FireServer("/announce " .. message, "All")
-            end)
-            print("[CHAT] Chat injection attempted!")
-        end
-    end
+    button.Size = UDim2.new(0, btnWidth - 5, 0, 38)
+    button.Position = UDim2.new(0, xPos, 0, yPos)
+    button.BackgroundColor3 = color
+    button.Text = text
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.TextSize = 13
+    button.Font = Enum.Font.GothamBold
+    button.BorderSizePixel = 0
+    button.Parent = ButtonsFrame
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 8)
+    btnCorner.Parent = button
+    
+    button.MouseEnter:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.new(color.R * 1.3, color.G * 1.3, color.B * 1.3),
+            Size = UDim2.new(0, btnWidth - 3, 0, 40)
+        }):Play()
+    end)
+    
+    button.MouseLeave:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.2), {
+            BackgroundColor3 = color,
+            Size = UDim2.new(0, btnWidth - 5, 0, 38)
+        }):Play()
+    end)
+    
+    button.MouseButton1Click:Connect(callback)
+    return button
 end
 
--- Compact Control Panel GUI
-local function CreateControlPanel()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "BackdoorControlPanel"
-    screenGui.ResetOnSpawn = false
-    screenGui.Parent = LocalPlayer.PlayerGui
-    
-    -- Main Frame - Lebih kecil
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 320, 0, 400) -- Diperkecil dari 400x550
-    frame.Position = UDim2.new(0.5, -160, 0.5, -200)
-    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    frame.BorderSizePixel = 2
-    frame.BorderColor3 = Color3.fromRGB(255, 50, 50)
-    frame.Parent = screenGui
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 10)
-    corner.Parent = frame
-    
-    -- Title - Lebih kecil
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, -16, 0, 35)
-    title.Position = UDim2.new(0, 8, 0, 8)
-    title.BackgroundTransparency = 1
-    title.Text = "⚠️ BACKDOOR EXPLOIT"
-    title.TextColor3 = Color3.fromRGB(255, 50, 50)
-    title.TextSize = 18
-    title.Font = Enum.Font.GothamBold
-    title.TextStrokeTransparency = 0.5
-    title.Parent = frame
-    
-    -- Subtitle - Lebih kecil
-    local subtitle = Instance.new("TextLabel")
-    subtitle.Size = UDim2.new(1, -16, 0, 18)
-    subtitle.Position = UDim2.new(0, 8, 0, 43)
-    subtitle.BackgroundTransparency = 1
-    subtitle.Text = "Warpah Injection System"
-    subtitle.TextColor3 = Color3.fromRGB(180, 180, 180)
-    subtitle.TextSize = 11
-    subtitle.Font = Enum.Font.Gotham
-    subtitle.Parent = frame
-    
-    -- TextBox - Lebih kecil
-    local textBox = Instance.new("TextBox")
-    textBox.Size = UDim2.new(1, -32, 0, 80)
-    textBox.Position = UDim2.new(0, 16, 0, 68)
-    textBox.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-    textBox.BorderColor3 = Color3.fromRGB(255, 50, 50)
-    textBox.BorderSizePixel = 1
-    textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-    textBox.TextSize = 13
-    textBox.Font = Enum.Font.Gotham
-    textBox.PlaceholderText = "Ketik pesan broadcast..."
-    textBox.PlaceholderColor3 = Color3.fromRGB(120, 120, 120)
-    textBox.TextWrapped = true
-    textBox.MultiLine = true
-    textBox.ClearTextOnFocus = false
-    textBox.TextXAlignment = Enum.TextXAlignment.Left
-    textBox.TextYAlignment = Enum.TextYAlignment.Top
-    textBox.Parent = frame
-    
-    local textCorner = Instance.new("UICorner")
-    textCorner.CornerRadius = UDim.new(0, 6)
-    textCorner.Parent = textBox
-    
-    local textPadding = Instance.new("UIPadding")
-    textPadding.PaddingLeft = UDim.new(0, 6)
-    textPadding.PaddingTop = UDim.new(0, 6)
-    textPadding.Parent = textBox
-    
-    -- Status Label - Lebih kecil
-    local statusLabel = Instance.new("TextLabel")
-    statusLabel.Size = UDim2.new(1, -32, 0, 28)
-    statusLabel.Position = UDim2.new(0, 16, 0, 156)
-    statusLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-    statusLabel.BorderSizePixel = 0
-    statusLabel.Text = "📊 Ready"
-    statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
-    statusLabel.TextSize = 11
-    statusLabel.Font = Enum.Font.GothamBold
-    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-    statusLabel.Parent = frame
-    
-    local statusCorner = Instance.new("UICorner")
-    statusCorner.CornerRadius = UDim.new(0, 6)
-    statusCorner.Parent = statusLabel
-    
-    local statusPadding = Instance.new("UIPadding")
-    statusPadding.PaddingLeft = UDim.new(0, 8)
-    statusPadding.Parent = statusLabel
-    
-    local function updateStatus(text, color)
-        statusLabel.Text = "📊 " .. text
-        statusLabel.TextColor3 = color
-    end
-    
-    -- Create Button Function - Lebih kecil
-    local function createButton(text, yPos, color, callback)
-        local button = Instance.new("TextButton")
-        button.Size = UDim2.new(1, -32, 0, 35) -- Diperkecil dari 45
-        button.Position = UDim2.new(0, 16, 0, yPos)
-        button.BackgroundColor3 = color
-        button.Text = text
-        button.TextColor3 = Color3.fromRGB(255, 255, 255)
-        button.TextSize = 12 -- Diperkecil dari 16
-        button.Font = Enum.Font.GothamBold
-        button.BorderSizePixel = 0
-        button.Parent = frame
-        
-        local btnCorner = Instance.new("UICorner")
-        btnCorner.CornerRadius = UDim.new(0, 6)
-        btnCorner.Parent = button
-        
-        button.MouseEnter:Connect(function()
-            TweenService:Create(button, TweenInfo.new(0.2), {
-                BackgroundColor3 = Color3.new(color.R * 1.2, color.G * 1.2, color.B * 1.2)
-            }):Play()
-        end)
-        
-        button.MouseLeave:Connect(function()
-            TweenService:Create(button, TweenInfo.new(0.2), {
-                BackgroundColor3 = color
-            }):Play()
-        end)
-        
-        button.MouseButton1Click:Connect(callback)
-        return button
-    end
-    
-    -- Buttons - Posisi disesuaikan dengan ukuran baru
-    createButton("🔍 SCAN", 192, Color3.fromRGB(80, 80, 200), function()
-        updateStatus("Scanning...", Color3.fromRGB(255, 255, 0))
-        local backdoors = FindBackdoors()
-        updateStatus("Found " .. #backdoors .. " backdoors!", Color3.fromRGB(0, 255, 100))
-    end)
-    
-    createButton("💉 BACKDOOR EXPLOIT", 235, Color3.fromRGB(255, 100, 0), function()
-        local msg = textBox.Text ~= "" and textBox.Text or "🔥 Test Broadcast!"
-        updateStatus("Exploiting...", Color3.fromRGB(255, 255, 0))
-        local success = BackdoorBroadcast(msg, 10)
-        if success then
-            updateStatus("Success!", Color3.fromRGB(0, 255, 100))
-            textBox.Text = ""
-        else
-            updateStatus("No backdoors!", Color3.fromRGB(255, 50, 50))
-        end
-    end)
-    
-    createButton("💥 SPAM REMOTES", 278, Color3.fromRGB(255, 0, 80), function()
-        local msg = textBox.Text ~= "" and textBox.Text or "⚠️ Spam Test!"
-        updateStatus("Spamming...", Color3.fromRGB(255, 255, 0))
-        SpamAllRemotes(msg, 10)
-        updateStatus("Fired!", Color3.fromRGB(0, 255, 100))
-        textBox.Text = ""
-    end)
-    
-    createButton("🛡️ HD ADMIN", 321, Color3.fromRGB(150, 0, 200), function()
-        local msg = textBox.Text ~= "" and textBox.Text or "📢 Admin Broadcast"
-        updateStatus("HD Admin...", Color3.fromRGB(255, 255, 0))
-        ExploitHDAdmin(msg)
-        InjectViaChat(msg)
-        updateStatus("Attempted!", Color3.fromRGB(0, 255, 100))
-        textBox.Text = ""
-    end)
-    
-    createButton("❌ CLOSE", 364, Color3.fromRGB(60, 60, 60), function()
-        screenGui:Destroy()
-    end)
-    
-    -- Draggable
-    local dragging, dragInput, dragStart, startPos
-    
-    frame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = frame.Position
-        end
-    end)
-    
-    frame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-    
-    frame.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-    
-    game:GetService("UserInputService").InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-end
+-- Create Buttons (2x3 grid)
+createButton("🔍 SCAN", 1, 1, Color3.fromRGB(70, 130, 250), function()
+    updateStatus("Scanning...", Color3.fromRGB(255, 255, 100))
+    FindBackdoors()
+    notify("Scan Complete", "Check logs")
+end)
 
--- Auto execute
-print("=== LOADING BACKDOOR EXPLOIT ===")
-task.wait(1)
-CreateControlPanel()
-print("=== READY ===")
-print("✅ Control panel loaded!")
-print("🔴 WARNING: Aggressive exploitation methods!")
-print("🔴 Use only on vulnerable games!")
+createButton("💉 BACKDOOR", 1, 2, Color3.fromRGB(255, 100, 50), function()
+    local msg = MessageBox.Text ~= "" and MessageBox.Text or "🔥 Test Broadcast!"
+    BackdoorBroadcast(msg, 10)
+    notify("Backdoor", "Exploit executed!")
+    MessageBox.Text = ""
+end)
+
+createButton("💥 SPAM", 2, 1, Color3.fromRGB(255, 50, 150), function()
+    local msg = MessageBox.Text ~= "" and MessageBox.Text or "⚠️ Spam Test!"
+    SpamAllRemotes(msg, 10)
+    notify("Spam", "All remotes fired!")
+    MessageBox.Text = ""
+end)
+
+createButton("🛡️ HD ADMIN", 2, 2, Color3.fromRGB(150, 50, 255), function()
+    local msg = MessageBox.Text ~= "" and MessageBox.Text or "📢 Admin Broadcast"
+    ExploitHDAdmin(msg)
+    notify("HD Admin", "Exploit attempted!")
+    MessageBox.Text = ""
+end)
+
+createButton("🗑️ CLEAR LOG", 3, 1, Color3.fromRGB(100, 100, 120), function()
+    logContent = ""
+    LogText.Text = "🔄 Log cleared\n"
+    addLog("Log history cleared", Color3.fromRGB(200, 200, 200))
+    updateStatus("Log cleared", Color3.fromRGB(200, 200, 200))
+end)
+
+createButton("❌ CLOSE", 3, 2, Color3.fromRGB(80, 80, 80), function()
+    ScreenGui:Destroy()
+    notify("Closed", "Backdoor exploit closed")
+end)
+
+-- Broadcast Button Event (di title bar)
+BroadcastButton.MouseButton1Click:Connect(function()
+    local msg = MessageBox.Text
+    if msg == "" then
+        notify("Warning", "Please enter a message first!")
+        updateStatus("Warning: Empty message", Color3.fromRGB(255, 200, 100))
+        return
+    end
+    
+    GameBroadcast(msg)
+    MessageBox.Text = ""
+end)
+
+BroadcastButton.MouseEnter:Connect(function()
+    TweenService:Create(BroadcastButton, TweenInfo.new(0.2), {
+        BackgroundColor3 = Color3.fromRGB(50, 200, 100),
+        Size = UDim2.new(0, 125, 0, 42)
+    }):Play()
+end)
+
+BroadcastButton.MouseLeave:Connect(function()
+    TweenService:Create(BroadcastButton, TweenInfo.new(0.2), {
+        BackgroundColor3 = Color3.fromRGB(40, 180, 80),
+        Size = UDim2.new(0, 120, 0, 40)
+    }):Play()
+end)
+
+-- Initial Log
+wait(0.5)
+addLog("═══════════════════════════════", Color3.fromRGB(255, 255, 255))
+addLog("🔥 BACKDOOR EXPLOIT V2 LOADED!", Color3.fromRGB(255, 100, 100))
+addLog("System ready for exploitation", Color3.fromRGB(100, 255, 100))
+addLog("📢 Use BROADCAST button for game's native system", Color3.fromRGB(100, 200, 255))
+addLog("═══════════════════════════════", Color3.fromRGB(255, 255, 255))
+updateStatus("Ready - Click SCAN or BROADCAST", Color3.fromRGB(100, 255, 100))
+
+notify("Loaded", "Backdoor Exploit V2 Ready!")
+
+print("\n╔═══════════════════════════════════════╗")
+print("║    BACKDOOR EXPLOIT V2 LOADED!        ║")
+print("║    📢 BROADCAST button ready!         ║")
+print("╚═══════════════════════════════════════╝\n")
