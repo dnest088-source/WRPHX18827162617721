@@ -1,0 +1,425 @@
+-- Warpah exe - Mobile Optimized
+-- Support: Delta X, Xeno, Arceus X, Hydrogen, Fluxus Mobile
+
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- Variabel
+local ExecutorGUI = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local TopBar = Instance.new("Frame")
+local Logo = Instance.new("ImageLabel")
+local Title = Instance.new("TextLabel")
+local CloseBtn = Instance.new("TextButton")
+local MinimizeBtn = Instance.new("TextButton")
+
+local ScriptInput = Instance.new("TextBox")
+local ExecuteBtn = Instance.new("TextButton")
+local ClearBtn = Instance.new("TextButton")
+local ClearLogBtn = Instance.new("TextButton")
+local CopyToClipboardBtn = Instance.new("TextButton")
+
+local OutputFrame = Instance.new("ScrollingFrame")
+local OutputText = Instance.new("TextLabel")
+
+-- Settings
+ExecutorGUI.Name = "WarpahExeGUI"
+ExecutorGUI.Parent = game.CoreGui
+ExecutorGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ExecutorGUI.ResetOnSpawn = false
+
+-- Main Frame (ukuran lebih kecil untuk mobile - 320x400)
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ExecutorGUI
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -200)
+MainFrame.Size = UDim2.new(0, 320, 0, 400)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.ClipsDescendants = false
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+-- Border hijau tipis
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(0, 220, 80)
+MainStroke.Thickness = 2
+MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+MainStroke.Parent = MainFrame
+
+-- Top Bar
+TopBar.Name = "TopBar"
+TopBar.Parent = MainFrame
+TopBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+TopBar.BorderSizePixel = 0
+TopBar.Size = UDim2.new(1, 0, 0, 35)
+
+local TopCorner = Instance.new("UICorner")
+TopCorner.CornerRadius = UDim.new(0, 10)
+TopCorner.Parent = TopBar
+
+-- Logo Image (Asset ID)
+Logo.Name = "Logo"
+Logo.Parent = TopBar
+Logo.BackgroundTransparency = 1
+Logo.Position = UDim2.new(0, 8, 0, 5)
+Logo.Size = UDim2.new(0, 25, 0, 25)
+Logo.Image = "rbxassetid://76586466123121"
+Logo.ScaleType = Enum.ScaleType.Fit
+
+-- Title
+Title.Name = "Title"
+Title.Parent = TopBar
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0, 38, 0, 0)
+Title.Size = UDim2.new(0, 180, 1, 0)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "Warpah exe"
+Title.TextColor3 = Color3.fromRGB(0, 220, 80)
+Title.TextSize = 16
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Close Button
+CloseBtn.Name = "CloseBtn"
+CloseBtn.Parent = TopBar
+CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Position = UDim2.new(1, -25, 0, 7.5)
+CloseBtn.Size = UDim2.new(0, 20, 0, 20)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Text = "×"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.TextSize = 14
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(1, 0)
+CloseCorner.Parent = CloseBtn
+
+-- Minimize Button
+MinimizeBtn.Name = "MinimizeBtn"
+MinimizeBtn.Parent = TopBar
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 60)
+MinimizeBtn.BorderSizePixel = 0
+MinimizeBtn.Position = UDim2.new(1, -48, 0, 7.5)
+MinimizeBtn.Size = UDim2.new(0, 20, 0, 20)
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.Text = "─"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.TextSize = 14
+
+local MinCorner = Instance.new("UICorner")
+MinCorner.CornerRadius = UDim.new(1, 0)
+MinCorner.Parent = MinimizeBtn
+
+-- Script Input (KOSONG - no default text)
+ScriptInput.Name = "ScriptInput"
+ScriptInput.Parent = MainFrame
+ScriptInput.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+ScriptInput.BorderSizePixel = 0
+ScriptInput.Position = UDim2.new(0, 8, 0, 42)
+ScriptInput.Size = UDim2.new(1, -16, 0, 150)
+ScriptInput.ClearTextOnFocus = false
+ScriptInput.Font = Enum.Font.Code
+ScriptInput.MultiLine = true
+ScriptInput.PlaceholderText = ""
+ScriptInput.Text = ""
+ScriptInput.TextColor3 = Color3.fromRGB(200, 200, 200)
+ScriptInput.TextSize = 13
+ScriptInput.TextXAlignment = Enum.TextXAlignment.Left
+ScriptInput.TextYAlignment = Enum.TextYAlignment.Top
+
+local InputCorner = Instance.new("UICorner")
+InputCorner.CornerRadius = UDim.new(0, 6)
+InputCorner.Parent = ScriptInput
+
+local InputStroke = Instance.new("UIStroke")
+InputStroke.Color = Color3.fromRGB(0, 180, 60)
+InputStroke.Thickness = 1
+InputStroke.Parent = ScriptInput
+
+-- Button Container
+local ButtonContainer = Instance.new("Frame")
+ButtonContainer.Name = "ButtonContainer"
+ButtonContainer.Parent = MainFrame
+ButtonContainer.BackgroundTransparency = 1
+ButtonContainer.Position = UDim2.new(0, 8, 0, 200)
+ButtonContainer.Size = UDim2.new(1, -16, 0, 60)
+
+-- Execute Button
+ExecuteBtn.Name = "ExecuteBtn"
+ExecuteBtn.Parent = ButtonContainer
+ExecuteBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 60)
+ExecuteBtn.BorderSizePixel = 0
+ExecuteBtn.Position = UDim2.new(0, 0, 0, 0)
+ExecuteBtn.Size = UDim2.new(0.48, 0, 0, 26)
+ExecuteBtn.Font = Enum.Font.GothamBold
+ExecuteBtn.Text = "▶ EXECUTE"
+ExecuteBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExecuteBtn.TextSize = 12
+
+local ExecCorner = Instance.new("UICorner")
+ExecCorner.CornerRadius = UDim.new(0, 5)
+ExecCorner.Parent = ExecuteBtn
+
+local ExecStroke = Instance.new("UIStroke")
+ExecStroke.Color = Color3.fromRGB(0, 220, 80)
+ExecStroke.Thickness = 1
+ExecStroke.Parent = ExecuteBtn
+
+-- Execute to Clipboard Button
+CopyToClipboardBtn.Name = "CopyToClipboardBtn"
+CopyToClipboardBtn.Parent = ButtonContainer
+CopyToClipboardBtn.BackgroundColor3 = Color3.fromRGB(40, 140, 180)
+CopyToClipboardBtn.BorderSizePixel = 0
+CopyToClipboardBtn.Position = UDim2.new(0.52, 0, 0, 0)
+CopyToClipboardBtn.Size = UDim2.new(0.48, 0, 0, 26)
+CopyToClipboardBtn.Font = Enum.Font.GothamBold
+CopyToClipboardBtn.Text = "📋 EXEC+CLIP"
+CopyToClipboardBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CopyToClipboardBtn.TextSize = 11
+
+local CopyCorner = Instance.new("UICorner")
+CopyCorner.CornerRadius = UDim.new(0, 5)
+CopyCorner.Parent = CopyToClipboardBtn
+
+local CopyStroke = Instance.new("UIStroke")
+CopyStroke.Color = Color3.fromRGB(80, 180, 220)
+CopyStroke.Thickness = 1
+CopyStroke.Parent = CopyToClipboardBtn
+
+-- Clear Button
+ClearBtn.Name = "ClearBtn"
+ClearBtn.Parent = ButtonContainer
+ClearBtn.BackgroundColor3 = Color3.fromRGB(180, 100, 0)
+ClearBtn.BorderSizePixel = 0
+ClearBtn.Position = UDim2.new(0, 0, 0, 32)
+ClearBtn.Size = UDim2.new(0.48, 0, 0, 26)
+ClearBtn.Font = Enum.Font.GothamBold
+ClearBtn.Text = "🗑 CLEAR"
+ClearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ClearBtn.TextSize = 12
+
+local ClearCorner = Instance.new("UICorner")
+ClearCorner.CornerRadius = UDim.new(0, 5)
+ClearCorner.Parent = ClearBtn
+
+local ClearStroke = Instance.new("UIStroke")
+ClearStroke.Color = Color3.fromRGB(220, 140, 0)
+ClearStroke.Thickness = 1
+ClearStroke.Parent = ClearBtn
+
+-- Clear Log Button
+ClearLogBtn.Name = "ClearLogBtn"
+ClearLogBtn.Parent = ButtonContainer
+ClearLogBtn.BackgroundColor3 = Color3.fromRGB(100, 60, 180)
+ClearLogBtn.BorderSizePixel = 0
+ClearLogBtn.Position = UDim2.new(0.52, 0, 0, 32)
+ClearLogBtn.Size = UDim2.new(0.48, 0, 0, 26)
+ClearLogBtn.Font = Enum.Font.GothamBold
+ClearLogBtn.Text = "📊 CLEAR LOG"
+ClearLogBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ClearLogBtn.TextSize = 11
+
+local LogCorner = Instance.new("UICorner")
+LogCorner.CornerRadius = UDim.new(0, 5)
+LogCorner.Parent = ClearLogBtn
+
+local LogStroke = Instance.new("UIStroke")
+LogStroke.Color = Color3.fromRGB(140, 100, 220)
+LogStroke.Thickness = 1
+LogStroke.Parent = ClearLogBtn
+
+-- Output Frame
+OutputFrame.Name = "OutputFrame"
+OutputFrame.Parent = MainFrame
+OutputFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+OutputFrame.BorderSizePixel = 0
+OutputFrame.Position = UDim2.new(0, 8, 0, 268)
+OutputFrame.Size = UDim2.new(1, -16, 0, 125)
+OutputFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+OutputFrame.ScrollBarThickness = 4
+
+local OutputCorner = Instance.new("UICorner")
+OutputCorner.CornerRadius = UDim.new(0, 6)
+OutputCorner.Parent = OutputFrame
+
+local OutputStroke = Instance.new("UIStroke")
+OutputStroke.Color = Color3.fromRGB(0, 180, 60)
+OutputStroke.Thickness = 1
+OutputStroke.Parent = OutputFrame
+
+-- Output Text
+OutputText.Name = "OutputText"
+OutputText.Parent = OutputFrame
+OutputText.BackgroundTransparency = 1
+OutputText.Size = UDim2.new(1, -8, 1, 0)
+OutputText.Position = UDim2.new(0, 4, 0, 0)
+OutputText.Font = Enum.Font.Code
+OutputText.Text = "[INFO] Warpah exe ready\n[INFO] Enter script and press Execute"
+OutputText.TextColor3 = Color3.fromRGB(150, 220, 150)
+OutputText.TextSize = 11
+OutputText.TextXAlignment = Enum.TextXAlignment.Left
+OutputText.TextYAlignment = Enum.TextYAlignment.Top
+OutputText.TextWrapped = true
+
+-- Log output
+local outputLog = ""
+local function addLog(text, isError)
+    local timestamp = os.date("%H:%M:%S")
+    local prefix = isError and "[ERROR]" or "[INFO]"
+    outputLog = outputLog .. string.format("[%s] %s %s\n", timestamp, prefix, tostring(text))
+    OutputText.Text = outputLog
+    OutputFrame.CanvasSize = UDim2.new(0, 0, 0, OutputText.TextBounds.Y + 10)
+    OutputFrame.CanvasPosition = Vector2.new(0, OutputFrame.CanvasSize.Y.Offset)
+end
+
+-- Execute Script Function
+local function executeScript(code)
+    addLog("=== Executing ===")
+    
+    local env = getfenv(0)
+    
+    local success, result = pcall(function()
+        local func, err = loadstring(code)
+        if not func then
+            error("Compile Error: " .. tostring(err))
+        end
+        
+        local scriptEnv = setmetatable({}, {
+            __index = function(t, k)
+                if k == "game" then return game
+                elseif k == "workspace" then return workspace
+                elseif k == "script" then return script
+                elseif k == "owner" then return Players.LocalPlayer
+                else return env[k] end
+            end,
+            __newindex = function(t, k, v) env[k] = v end
+        })
+        
+        setfenv(func, scriptEnv)
+        return func()
+    end)
+    
+    if success then
+        if result ~= nil then
+            addLog("Return: " .. tostring(result))
+        end
+        addLog("=== Success ===")
+    else
+        addLog(tostring(result), true)
+    end
+end
+
+-- Button Functions
+ExecuteBtn.MouseButton1Click:Connect(function()
+    ExecuteBtn.BackgroundColor3 = Color3.fromRGB(0, 220, 80)
+    wait(0.1)
+    ExecuteBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 60)
+    
+    local code = ScriptInput.Text
+    if code and code ~= "" then
+        executeScript(code)
+    else
+        addLog("Script is empty!", true)
+    end
+end)
+
+-- Execute to Clipboard - FIXED VERSION
+CopyToClipboardBtn.MouseButton1Click:Connect(function()
+    CopyToClipboardBtn.BackgroundColor3 = Color3.fromRGB(80, 180, 220)
+    wait(0.1)
+    CopyToClipboardBtn.BackgroundColor3 = Color3.fromRGB(40, 140, 180)
+    
+    local code = ScriptInput.Text
+    if code and code ~= "" then
+        -- Try multiple clipboard methods for compatibility
+        local clipboardSuccess = false
+        
+        -- Method 1: setclipboard (most common)
+        if setclipboard then
+            pcall(function()
+                setclipboard(code)
+                clipboardSuccess = true
+            end)
+        end
+        
+        -- Method 2: toclipboard (alternative)
+        if not clipboardSuccess and toclipboard then
+            pcall(function()
+                toclipboard(code)
+                clipboardSuccess = true
+            end)
+        end
+        
+        -- Method 3: Clipboard.set (some executors)
+        if not clipboardSuccess and Clipboard and Clipboard.set then
+            pcall(function()
+                Clipboard.set(code)
+                clipboardSuccess = true
+            end)
+        end
+        
+        if clipboardSuccess then
+            addLog("Copied to clipboard!")
+        else
+            addLog("Clipboard not supported", true)
+        end
+        
+        -- Execute the script
+        executeScript(code)
+    else
+        addLog("Script is empty!", true)
+    end
+end)
+
+ClearBtn.MouseButton1Click:Connect(function()
+    ClearBtn.BackgroundColor3 = Color3.fromRGB(220, 140, 0)
+    wait(0.1)
+    ClearBtn.BackgroundColor3 = Color3.fromRGB(180, 100, 0)
+    
+    ScriptInput.Text = ""
+    addLog("Script cleared")
+end)
+
+ClearLogBtn.MouseButton1Click:Connect(function()
+    ClearLogBtn.BackgroundColor3 = Color3.fromRGB(140, 100, 220)
+    wait(0.1)
+    ClearLogBtn.BackgroundColor3 = Color3.fromRGB(100, 60, 180)
+    
+    outputLog = ""
+    OutputText.Text = "[INFO] Log cleared"
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    ExecutorGUI:Destroy()
+end)
+
+local minimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        ScriptInput.Visible = false
+        ButtonContainer.Visible = false
+        OutputFrame.Visible = false
+        
+        MainFrame:TweenSize(UDim2.new(0, 320, 0, 35), "Out", "Quad", 0.3, true)
+        MinimizeBtn.Text = "+"
+    else
+        ScriptInput.Visible = true
+        ButtonContainer.Visible = true
+        OutputFrame.Visible = true
+        
+        MainFrame:TweenSize(UDim2.new(0, 320, 0, 400), "Out", "Quad", 0.3, true)
+        MinimizeBtn.Text = "─"
+    end
+end)
+
+-- Initial log
+addLog("Warpah exe loaded!")
+addLog("Ready to execute")
+
+print("Warpah exe loaded!")
