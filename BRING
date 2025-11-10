@@ -1,0 +1,1181 @@
+-- Bring Unanchored Parts Script - COMPACT ANDROID VERSION
+-- Background Hitam + Border Hijau Neon
+-- Input settings untuk Radius & Power
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- Variabel global
+local bringing = false
+local unanchoredParts = {}
+local targetPlayer = nil
+local bringConnection = nil
+local bodyMovers = {}
+local nearbyPlayers = {}
+
+-- Optimasi variables
+local lastScanTime = 0
+local scanCooldown = 2
+local processedParts = {}
+local maxPartsPerFrame = 15
+
+-- Settings yang bisa diubah
+local Settings = {
+    Radius = 500, -- Default 500 studs
+    Power = 50000, -- Default 50000
+    Damping = 5000, -- Default 5000
+    VelocityBoost = 100 -- Default 100
+}
+
+-- Fungsi untuk membuat notifikasi
+local function notify(title, text, duration)
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = title;
+        Text = text;
+        Duration = duration or 3;
+    })
+end
+
+-- Fungsi untuk mendapatkan player dalam radius
+local function getNearbyPlayers()
+    nearbyPlayers = {}
+    
+    local localChar = LocalPlayer.Character
+    if not localChar then return nearbyPlayers end
+    
+    local localRoot = localChar:FindFirstChild("HumanoidRootPart")
+    if not localRoot then return nearbyPlayers end
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+            if targetRoot then
+                local distance = (localRoot.Position - targetRoot.Position).Magnitude
+                if distance <= Settings.Radius then
+                    table.insert(nearbyPlayers, {
+                        player = player,
+                        distance = math.floor(distance)
+                    })
+                end
+            end
+        end
+    end
+    
+    table.sort(nearbyPlayers, function(a, b)
+        return a.distance < b.distance
+    end)
+    
+    return nearbyPlayers
+end
+
+-- Fungsi untuk membuat GUI COMPACT ANDROID
+local function createGUI()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "BringPartsGUI"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    -- Main Frame - COMPACT untuk Android
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 270, 0, 385)
+    MainFrame.Position = UDim2.new(0.5, -135, 0.5, -192)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Active = true
+    MainFrame.Draggable = true
+    MainFrame.ClipsDescendants = false
+    MainFrame.Parent = ScreenGui
+    
+    local MainCorner = Instance.new("UICorner")
+    MainCorner.CornerRadius = UDim.new(0, 10)
+    MainCorner.Parent = MainFrame
+    
+    -- Border HIJAU NEON
+    local NeonBorder = Instance.new("UIStroke")
+    NeonBorder.Color = Color3.fromRGB(0, 255, 0)
+    NeonBorder.Thickness = 2
+    NeonBorder.Transparency = 0
+    NeonBorder.Parent = MainFrame
+    
+    -- Title Bar
+    local TitleBar = Instance.new("Frame")
+    TitleBar.Name = "TitleBar"
+    TitleBar.Size = UDim2.new(1, 0, 0, 42)
+    TitleBar.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    TitleBar.BorderSizePixel = 0
+    TitleBar.Parent = MainFrame
+    
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 10)
+    TitleCorner.Parent = TitleBar
+    
+    local TitleFix = Instance.new("Frame")
+    TitleFix.Size = UDim2.new(1, 0, 0, 10)
+    TitleFix.Position = UDim2.new(0, 0, 1, -10)
+    TitleFix.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    TitleFix.BorderSizePixel = 0
+    TitleFix.Parent = TitleBar
+    
+    -- Icon
+    local IconCircle = Instance.new("Frame")
+    IconCircle.Size = UDim2.new(0, 26, 0, 26)
+    IconCircle.Position = UDim2.new(0, 8, 0, 8)
+    IconCircle.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+    IconCircle.BorderSizePixel = 0
+    IconCircle.Parent = TitleBar
+    
+    local IconCircleCorner = Instance.new("UICorner")
+    IconCircleCorner.CornerRadius = UDim.new(1, 0)
+    IconCircleCorner.Parent = IconCircle
+    
+    local IconCircleBorder = Instance.new("UIStroke")
+    IconCircleBorder.Color = Color3.fromRGB(0, 255, 0)
+    IconCircleBorder.Thickness = 1.5
+    IconCircleBorder.Parent = IconCircle
+    
+    local IconText = Instance.new("TextLabel")
+    IconText.Size = UDim2.new(1, 0, 1, 0)
+    IconText.BackgroundTransparency = 1
+    IconText.Text = "⚡"
+    IconText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    IconText.TextSize = 14
+    IconText.Font = Enum.Font.GothamBold
+    IconText.Parent = IconCircle
+    
+    -- Title Text
+    local Title = Instance.new("TextLabel")
+    Title.Name = "Title"
+    Title.Size = UDim2.new(1, -110, 0, 18)
+    Title.Position = UDim2.new(0, 40, 0, 6)
+    Title.BackgroundTransparency = 1
+    Title.Text = "BRING TARGET"
+    Title.TextColor3 = Color3.fromRGB(0, 255, 0)
+    Title.TextSize = 13
+    Title.Font = Enum.Font.GothamBold
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Parent = TitleBar
+    
+    local Subtitle = Instance.new("TextLabel")
+    Subtitle.Size = UDim2.new(1, -110, 0, 12)
+    Subtitle.Position = UDim2.new(0, 40, 0, 23)
+    Subtitle.BackgroundTransparency = 1
+    Subtitle.Text = "Compact Mode"
+    Subtitle.TextColor3 = Color3.fromRGB(100, 255, 100)
+    Subtitle.TextSize = 8
+    Subtitle.Font = Enum.Font.Gotham
+    Subtitle.TextXAlignment = Enum.TextXAlignment.Left
+    Subtitle.Parent = TitleBar
+    
+    -- Window Controls
+    local ControlsFrame = Instance.new("Frame")
+    ControlsFrame.Size = UDim2.new(0, 56, 0, 24)
+    ControlsFrame.Position = UDim2.new(1, -64, 0, 9)
+    ControlsFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    ControlsFrame.BorderSizePixel = 0
+    ControlsFrame.Parent = TitleBar
+    
+    local ControlsCorner = Instance.new("UICorner")
+    ControlsCorner.CornerRadius = UDim.new(0, 5)
+    ControlsCorner.Parent = ControlsFrame
+    
+    local ControlsBorder = Instance.new("UIStroke")
+    ControlsBorder.Color = Color3.fromRGB(0, 255, 0)
+    ControlsBorder.Thickness = 1
+    ControlsBorder.Parent = ControlsFrame
+    
+    local MinimizeBtn = Instance.new("TextButton")
+    MinimizeBtn.Name = "MinimizeBtn"
+    MinimizeBtn.Size = UDim2.new(0, 26, 0, 22)
+    MinimizeBtn.Position = UDim2.new(0, 1, 0, 1)
+    MinimizeBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+    MinimizeBtn.Text = "─"
+    MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    MinimizeBtn.TextSize = 11
+    MinimizeBtn.Font = Enum.Font.GothamBold
+    MinimizeBtn.BorderSizePixel = 0
+    MinimizeBtn.Parent = ControlsFrame
+    
+    local MinCorner = Instance.new("UICorner")
+    MinCorner.CornerRadius = UDim.new(0, 4)
+    MinCorner.Parent = MinimizeBtn
+    
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Name = "CloseBtn"
+    CloseBtn.Size = UDim2.new(0, 26, 0, 22)
+    CloseBtn.Position = UDim2.new(1, -27, 0, 1)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+    CloseBtn.Text = "✕"
+    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseBtn.TextSize = 11
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.BorderSizePixel = 0
+    CloseBtn.Parent = ControlsFrame
+    
+    local CloseCorner = Instance.new("UICorner")
+    CloseCorner.CornerRadius = UDim.new(0, 4)
+    CloseCorner.Parent = CloseBtn
+    
+    -- Content Frame
+    local ContentFrame = Instance.new("Frame")
+    ContentFrame.Name = "ContentFrame"
+    ContentFrame.Size = UDim2.new(1, -16, 1, -50)
+    ContentFrame.Position = UDim2.new(0, 8, 0, 46)
+    ContentFrame.BackgroundTransparency = 1
+    ContentFrame.Parent = MainFrame
+    
+    -- Stats Container
+    local StatsContainer = Instance.new("Frame")
+    StatsContainer.Size = UDim2.new(1, 0, 0, 48)
+    StatsContainer.Position = UDim2.new(0, 0, 0, 0)
+    StatsContainer.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    StatsContainer.BorderSizePixel = 0
+    StatsContainer.Parent = ContentFrame
+    
+    local StatsCorner = Instance.new("UICorner")
+    StatsCorner.CornerRadius = UDim.new(0, 8)
+    StatsCorner.Parent = StatsContainer
+    
+    local StatsBorder = Instance.new("UIStroke")
+    StatsBorder.Color = Color3.fromRGB(0, 255, 0)
+    StatsBorder.Thickness = 1
+    StatsBorder.Parent = StatsContainer
+    
+    -- Parts Card
+    local PartsCard = Instance.new("Frame")
+    PartsCard.Size = UDim2.new(0.48, 0, 1, -6)
+    PartsCard.Position = UDim2.new(0, 3, 0, 3)
+    PartsCard.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    PartsCard.BorderSizePixel = 0
+    PartsCard.Parent = StatsContainer
+    
+    local PartsCardCorner = Instance.new("UICorner")
+    PartsCardCorner.CornerRadius = UDim.new(0, 6)
+    PartsCardCorner.Parent = PartsCard
+    
+    local PartsIcon = Instance.new("TextLabel")
+    PartsIcon.Size = UDim2.new(0, 22, 0, 22)
+    PartsIcon.Position = UDim2.new(0, 5, 0, 4)
+    PartsIcon.BackgroundTransparency = 1
+    PartsIcon.Text = "📦"
+    PartsIcon.TextSize = 14
+    PartsIcon.Parent = PartsCard
+    
+    local PartsLabel = Instance.new("TextLabel")
+    PartsLabel.Size = UDim2.new(1, -32, 0, 11)
+    PartsLabel.Position = UDim2.new(0, 28, 0, 5)
+    PartsLabel.BackgroundTransparency = 1
+    PartsLabel.Text = "Parts"
+    PartsLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    PartsLabel.TextSize = 9
+    PartsLabel.Font = Enum.Font.Gotham
+    PartsLabel.TextXAlignment = Enum.TextXAlignment.Left
+    PartsLabel.Parent = PartsCard
+    
+    local PartsValue = Instance.new("TextLabel")
+    PartsValue.Name = "PartsValue"
+    PartsValue.Size = UDim2.new(1, -32, 0, 18)
+    PartsValue.Position = UDim2.new(0, 28, 0, 17)
+    PartsValue.BackgroundTransparency = 1
+    PartsValue.Text = "0"
+    PartsValue.TextColor3 = Color3.fromRGB(0, 255, 0)
+    PartsValue.TextSize = 16
+    PartsValue.Font = Enum.Font.GothamBold
+    PartsValue.TextXAlignment = Enum.TextXAlignment.Left
+    PartsValue.Parent = PartsCard
+    
+    -- Players Card
+    local PlayersCard = Instance.new("Frame")
+    PlayersCard.Size = UDim2.new(0.48, 0, 1, -6)
+    PlayersCard.Position = UDim2.new(0.52, 0, 0, 3)
+    PlayersCard.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    PlayersCard.BorderSizePixel = 0
+    PlayersCard.Parent = StatsContainer
+    
+    local PlayersCardCorner = Instance.new("UICorner")
+    PlayersCardCorner.CornerRadius = UDim.new(0, 6)
+    PlayersCardCorner.Parent = PlayersCard
+    
+    local PlayersIcon = Instance.new("TextLabel")
+    PlayersIcon.Size = UDim2.new(0, 22, 0, 22)
+    PlayersIcon.Position = UDim2.new(0, 5, 0, 4)
+    PlayersIcon.BackgroundTransparency = 1
+    PlayersIcon.Text = "👥"
+    PlayersIcon.TextSize = 14
+    PlayersIcon.Parent = PlayersCard
+    
+    local PlayersLabel = Instance.new("TextLabel")
+    PlayersLabel.Size = UDim2.new(1, -32, 0, 11)
+    PlayersLabel.Position = UDim2.new(0, 28, 0, 5)
+    PlayersLabel.BackgroundTransparency = 1
+    PlayersLabel.Text = "Nearby"
+    PlayersLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    PlayersLabel.TextSize = 9
+    PlayersLabel.Font = Enum.Font.Gotham
+    PlayersLabel.TextXAlignment = Enum.TextXAlignment.Left
+    PlayersLabel.Parent = PlayersCard
+    
+    local PlayersValue = Instance.new("TextLabel")
+    PlayersValue.Name = "PlayersValue"
+    PlayersValue.Size = UDim2.new(1, -32, 0, 18)
+    PlayersValue.Position = UDim2.new(0, 28, 0, 17)
+    PlayersValue.BackgroundTransparency = 1
+    PlayersValue.Text = "0"
+    PlayersValue.TextColor3 = Color3.fromRGB(0, 255, 0)
+    PlayersValue.TextSize = 16
+    PlayersValue.Font = Enum.Font.GothamBold
+    PlayersValue.TextXAlignment = Enum.TextXAlignment.Left
+    PlayersValue.Parent = PlayersCard
+    
+    -- Player List Section
+    local PlayerSection = Instance.new("Frame")
+    PlayerSection.Size = UDim2.new(1, 0, 0, 115)
+    PlayerSection.Position = UDim2.new(0, 0, 0, 53)
+    PlayerSection.BackgroundTransparency = 1
+    PlayerSection.Parent = ContentFrame
+    
+    local PlayerSectionLabel = Instance.new("TextLabel")
+    PlayerSectionLabel.Size = UDim2.new(1, 0, 0, 14)
+    PlayerSectionLabel.Position = UDim2.new(0, 0, 0, 0)
+    PlayerSectionLabel.BackgroundTransparency = 1
+    PlayerSectionLabel.Text = "🎯 SELECT TARGET"
+    PlayerSectionLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    PlayerSectionLabel.TextSize = 9
+    PlayerSectionLabel.Font = Enum.Font.GothamBold
+    PlayerSectionLabel.TextXAlignment = Enum.TextXAlignment.Left
+    PlayerSectionLabel.Parent = PlayerSection
+    
+    -- Player List ScrollFrame
+    local PlayerListFrame = Instance.new("ScrollingFrame")
+    PlayerListFrame.Name = "PlayerListFrame"
+    PlayerListFrame.Size = UDim2.new(1, 0, 1, -17)
+    PlayerListFrame.Position = UDim2.new(0, 0, 0, 16)
+    PlayerListFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    PlayerListFrame.BorderSizePixel = 0
+    PlayerListFrame.ScrollBarThickness = 3
+    PlayerListFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 0)
+    PlayerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    PlayerListFrame.Parent = PlayerSection
+    
+    local ListCorner = Instance.new("UICorner")
+    ListCorner.CornerRadius = UDim.new(0, 7)
+    ListCorner.Parent = PlayerListFrame
+    
+    local ListBorder = Instance.new("UIStroke")
+    ListBorder.Color = Color3.fromRGB(0, 255, 0)
+    ListBorder.Thickness = 1
+    ListBorder.Parent = PlayerListFrame
+    
+    local ListPadding = Instance.new("UIPadding")
+    ListPadding.PaddingTop = UDim.new(0, 3)
+    ListPadding.PaddingBottom = UDim.new(0, 3)
+    ListPadding.PaddingLeft = UDim.new(0, 3)
+    ListPadding.PaddingRight = UDim.new(0, 3)
+    ListPadding.Parent = PlayerListFrame
+    
+    local ListLayout = Instance.new("UIListLayout")
+    ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    ListLayout.Padding = UDim.new(0, 3)
+    ListLayout.Parent = PlayerListFrame
+    
+    -- Settings Section
+    local SettingsSection = Instance.new("Frame")
+    SettingsSection.Name = "SettingsSection"
+    SettingsSection.Size = UDim2.new(1, 0, 0, 82)
+    SettingsSection.Position = UDim2.new(0, 0, 0, 173)
+    SettingsSection.BackgroundTransparency = 1
+    SettingsSection.Parent = ContentFrame
+    
+    local SettingsLabel = Instance.new("TextLabel")
+    SettingsLabel.Size = UDim2.new(1, 0, 0, 14)
+    SettingsLabel.BackgroundTransparency = 1
+    SettingsLabel.Text = "⚙️ SETTINGS"
+    SettingsLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    SettingsLabel.TextSize = 9
+    SettingsLabel.Font = Enum.Font.GothamBold
+    SettingsLabel.TextXAlignment = Enum.TextXAlignment.Left
+    SettingsLabel.Parent = SettingsSection
+    
+    -- Settings Container
+    local SettingsContainer = Instance.new("Frame")
+    SettingsContainer.Size = UDim2.new(1, 0, 1, -17)
+    SettingsContainer.Position = UDim2.new(0, 0, 0, 16)
+    SettingsContainer.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    SettingsContainer.BorderSizePixel = 0
+    SettingsContainer.Parent = SettingsSection
+    
+    local SettingsCorner = Instance.new("UICorner")
+    SettingsCorner.CornerRadius = UDim.new(0, 7)
+    SettingsCorner.Parent = SettingsContainer
+    
+    local SettingsBorder = Instance.new("UIStroke")
+    SettingsBorder.Color = Color3.fromRGB(0, 255, 0)
+    SettingsBorder.Thickness = 1
+    SettingsBorder.Parent = SettingsContainer
+    
+    local SettingsPadding = Instance.new("UIPadding")
+    SettingsPadding.PaddingTop = UDim.new(0, 5)
+    SettingsPadding.PaddingBottom = UDim.new(0, 5)
+    SettingsPadding.PaddingLeft = UDim.new(0, 7)
+    SettingsPadding.PaddingRight = UDim.new(0, 7)
+    SettingsPadding.Parent = SettingsContainer
+    
+    -- Radius Input
+    local RadiusLabel = Instance.new("TextLabel")
+    RadiusLabel.Size = UDim2.new(0, 45, 0, 12)
+    RadiusLabel.Position = UDim2.new(0, 0, 0, 0)
+    RadiusLabel.BackgroundTransparency = 1
+    RadiusLabel.Text = "Radius:"
+    RadiusLabel.TextColor3 = Color3.fromRGB(200, 255, 200)
+    RadiusLabel.TextSize = 9
+    RadiusLabel.Font = Enum.Font.Gotham
+    RadiusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    RadiusLabel.Parent = SettingsContainer
+    
+    local RadiusInput = Instance.new("TextBox")
+    RadiusInput.Name = "RadiusInput"
+    RadiusInput.Size = UDim2.new(1, -50, 0, 24)
+    RadiusInput.Position = UDim2.new(0, 48, 0, -2)
+    RadiusInput.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    RadiusInput.BorderSizePixel = 0
+    RadiusInput.Text = tostring(Settings.Radius) .. " studs"
+    RadiusInput.TextColor3 = Color3.fromRGB(0, 255, 0)
+    RadiusInput.TextSize = 11
+    RadiusInput.Font = Enum.Font.GothamBold
+    RadiusInput.PlaceholderText = "500"
+    RadiusInput.ClearTextOnFocus = false
+    RadiusInput.Parent = SettingsContainer
+    
+    local RadiusCorner = Instance.new("UICorner")
+    RadiusCorner.CornerRadius = UDim.new(0, 5)
+    RadiusCorner.Parent = RadiusInput
+    
+    local RadiusBorder = Instance.new("UIStroke")
+    RadiusBorder.Color = Color3.fromRGB(0, 200, 0)
+    RadiusBorder.Thickness = 1
+    RadiusBorder.Parent = RadiusInput
+    
+    -- Power Input
+    local PowerLabel = Instance.new("TextLabel")
+    PowerLabel.Size = UDim2.new(0, 45, 0, 12)
+    PowerLabel.Position = UDim2.new(0, 0, 0, 32)
+    PowerLabel.BackgroundTransparency = 1
+    PowerLabel.Text = "Power:"
+    PowerLabel.TextColor3 = Color3.fromRGB(200, 255, 200)
+    PowerLabel.TextSize = 9
+    PowerLabel.Font = Enum.Font.Gotham
+    PowerLabel.TextXAlignment = Enum.TextXAlignment.Left
+    PowerLabel.Parent = SettingsContainer
+    
+    local PowerInput = Instance.new("TextBox")
+    PowerInput.Name = "PowerInput"
+    PowerInput.Size = UDim2.new(1, -50, 0, 24)
+    PowerInput.Position = UDim2.new(0, 48, 0, 30)
+    PowerInput.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    PowerInput.BorderSizePixel = 0
+    PowerInput.Text = tostring(Settings.Power)
+    PowerInput.TextColor3 = Color3.fromRGB(0, 255, 0)
+    PowerInput.TextSize = 11
+    PowerInput.Font = Enum.Font.GothamBold
+    PowerInput.PlaceholderText = "50000"
+    PowerInput.ClearTextOnFocus = false
+    PowerInput.Parent = SettingsContainer
+    
+    local PowerCorner = Instance.new("UICorner")
+    PowerCorner.CornerRadius = UDim.new(0, 5)
+    PowerCorner.Parent = PowerInput
+    
+    local PowerBorder = Instance.new("UIStroke")
+    PowerBorder.Color = Color3.fromRGB(0, 200, 0)
+    PowerBorder.Thickness = 1
+    PowerBorder.Parent = PowerInput
+    
+    -- Action Buttons Container
+    local ButtonsContainer = Instance.new("Frame")
+    ButtonsContainer.Size = UDim2.new(1, 0, 0, 74)
+    ButtonsContainer.Position = UDim2.new(0, 0, 1, -74)
+    ButtonsContainer.BackgroundTransparency = 1
+    ButtonsContainer.Parent = ContentFrame
+    
+    -- Bring Button
+    local BringBtn = Instance.new("TextButton")
+    BringBtn.Name = "BringBtn"
+    BringBtn.Size = UDim2.new(1, 0, 0, 38)
+    BringBtn.Position = UDim2.new(0, 0, 0, 0)
+    BringBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+    BringBtn.BorderSizePixel = 0
+    BringBtn.Text = ""
+    BringBtn.AutoButtonColor = false
+    BringBtn.Parent = ButtonsContainer
+    
+    local BringCorner = Instance.new("UICorner")
+    BringCorner.CornerRadius = UDim.new(0, 7)
+    BringCorner.Parent = BringBtn
+    
+    local BringBorder = Instance.new("UIStroke")
+    BringBorder.Color = Color3.fromRGB(0, 255, 0)
+    BringBorder.Thickness = 2
+    BringBorder.Parent = BringBtn
+    
+    local BringIcon = Instance.new("TextLabel")
+    BringIcon.Size = UDim2.new(0, 28, 0, 28)
+    BringIcon.Position = UDim2.new(0, 6, 0, 5)
+    BringIcon.BackgroundTransparency = 1
+    BringIcon.Text = "⚡"
+    BringIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+    BringIcon.TextSize = 18
+    BringIcon.Font = Enum.Font.GothamBold
+    BringIcon.Parent = BringBtn
+    
+    local BringText = Instance.new("TextLabel")
+    BringText.Name = "BringText"
+    BringText.Size = UDim2.new(1, -44, 0, 16)
+    BringText.Position = UDim2.new(0, 38, 0, 6)
+    BringText.BackgroundTransparency = 1
+    BringText.Text = "BRING"
+    BringText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    BringText.TextSize = 13
+    BringText.Font = Enum.Font.GothamBold
+    BringText.TextXAlignment = Enum.TextXAlignment.Left
+    BringText.Parent = BringBtn
+    
+    local BringSubtext = Instance.new("TextLabel")
+    BringSubtext.Size = UDim2.new(1, -44, 0, 11)
+    BringSubtext.Position = UDim2.new(0, 38, 0, 21)
+    BringSubtext.BackgroundTransparency = 1
+    BringSubtext.Text = "Start pulling parts"
+    BringSubtext.TextColor3 = Color3.fromRGB(200, 255, 200)
+    BringSubtext.TextSize = 8
+    BringSubtext.Font = Enum.Font.Gotham
+    BringSubtext.TextXAlignment = Enum.TextXAlignment.Left
+    BringSubtext.Parent = BringBtn
+    
+    -- Refresh Button
+    local RefreshBtn = Instance.new("TextButton")
+    RefreshBtn.Name = "RefreshBtn"
+    RefreshBtn.Size = UDim2.new(1, 0, 0, 32)
+    RefreshBtn.Position = UDim2.new(0, 0, 1, -32)
+    RefreshBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    RefreshBtn.BorderSizePixel = 0
+    RefreshBtn.Text = ""
+    RefreshBtn.AutoButtonColor = false
+    RefreshBtn.Parent = ButtonsContainer
+    
+    local RefreshCorner = Instance.new("UICorner")
+    RefreshCorner.CornerRadius = UDim.new(0, 7)
+    RefreshCorner.Parent = RefreshBtn
+    
+    local RefreshBorder = Instance.new("UIStroke")
+    RefreshBorder.Color = Color3.fromRGB(0, 255, 0)
+    RefreshBorder.Thickness = 1
+    RefreshBorder.Parent = RefreshBtn
+    
+    local RefreshIcon = Instance.new("TextLabel")
+    RefreshIcon.Size = UDim2.new(0, 24, 1, 0)
+    RefreshIcon.Position = UDim2.new(0, 5, 0, 0)
+    RefreshIcon.BackgroundTransparency = 1
+    RefreshIcon.Text = "🔄"
+    RefreshIcon.TextColor3 = Color3.fromRGB(0, 255, 0)
+    RefreshIcon.TextSize = 13
+    RefreshIcon.Parent = RefreshBtn
+    
+    local RefreshText = Instance.new("TextLabel")
+    RefreshText.Size = UDim2.new(1, -34, 1, 0)
+    RefreshText.Position = UDim2.new(0, 30, 0, 0)
+    RefreshText.BackgroundTransparency = 1
+    RefreshText.Text = "Refresh Players & Parts"
+    RefreshText.TextColor3 = Color3.fromRGB(0, 255, 0)
+    RefreshText.TextSize = 10
+    RefreshText.Font = Enum.Font.GothamBold
+    RefreshText.TextXAlignment = Enum.TextXAlignment.Left
+    RefreshText.Parent = RefreshBtn
+    
+    ScreenGui.Parent = game.CoreGui or LocalPlayer:WaitForChild("PlayerGui")
+    
+    return ScreenGui, MainFrame, BringBtn, RefreshBtn, MinimizeBtn, CloseBtn, PlayerListFrame, PartsValue, PlayersValue, ListLayout, BringText, ContentFrame, NeonBorder, RadiusInput, PowerInput
+end
+
+-- Fungsi untuk scan unanchored parts
+local function scanUnanchoredParts()
+    unanchoredParts = {}
+    local count = 0
+    
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and not obj.Anchored and obj.Name ~= "Baseplate" then
+            local isPlayerPart = false
+            local parent = obj.Parent
+            
+            while parent do
+                if parent:IsA("Model") then
+                    if Players:GetPlayerFromCharacter(parent) then
+                        isPlayerPart = true
+                        break
+                    end
+                    if parent:FindFirstChildOfClass("Humanoid") then
+                        isPlayerPart = true
+                        break
+                    end
+                end
+                parent = parent.Parent
+            end
+            
+            if not isPlayerPart then
+                table.insert(unanchoredParts, obj)
+                count = count + 1
+            end
+        end
+    end
+    
+    return count
+end
+
+-- Fungsi untuk delete SEMUA constraint dan rope - OPTIMIZED
+local function deleteAllConstraints(part)
+    if processedParts[part] and tick() - processedParts[part] < 1 then
+        return
+    end
+    
+    processedParts[part] = tick()
+    
+    pcall(function()
+        local constraintsToDelete = {}
+        
+        for _, child in pairs(part:GetChildren()) do
+            if child:IsA("Constraint") then
+                table.insert(constraintsToDelete, child)
+            end
+        end
+        
+        for _, constraint in pairs(constraintsToDelete) do
+            constraint:Destroy()
+        end
+        
+        for _, attachment in pairs(part:GetChildren()) do
+            if attachment:IsA("Attachment") then
+                for _, constraint in pairs(attachment:GetChildren()) do
+                    if constraint:IsA("Constraint") then
+                        constraint:Destroy()
+                    end
+                end
+            end
+        end
+        
+        local partPosition = part.Position
+        local searchRadius = 50
+        
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            if obj:IsA("Constraint") then
+                local isNearby = false
+                
+                if obj:IsA("RopeConstraint") or obj:IsA("RodConstraint") or 
+                   obj:IsA("SpringConstraint") then
+                    if obj.Attachment0 and obj.Attachment0.Parent then
+                        local dist = (obj.Attachment0.WorldPosition - partPosition).Magnitude
+                        if dist < searchRadius then
+                            isNearby = true
+                        end
+                    end
+                end
+                
+                if isNearby then
+                    pcall(function()
+                        if obj.Attachment0 and obj.Attachment1 then
+                            if obj.Attachment0.Parent == part or obj.Attachment1.Parent == part then
+                                obj:Destroy()
+                            end
+                        elseif obj:IsA("WeldConstraint") or obj:IsA("RigidConstraint") then
+                            if obj.Part0 == part or obj.Part1 == part then
+                                obj:Destroy()
+                            end
+                        end
+                    end)
+                end
+            end
+        end
+    end)
+end
+
+-- Fungsi bring dengan physical manipulation - OPTIMIZED
+local currentPartIndex = 1
+
+local function bringPartsPhysical()
+    if not targetPlayer or not targetPlayer.Character then
+        return
+    end
+    
+    local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not targetRoot then
+        return
+    end
+    
+    if tick() - lastScanTime > scanCooldown then
+        scanUnanchoredParts()
+        lastScanTime = tick()
+    end
+    
+    local partsProcessed = 0
+    local startIndex = currentPartIndex
+    
+    for i = startIndex, #unanchoredParts do
+        if partsProcessed >= maxPartsPerFrame then
+            currentPartIndex = i + 1
+            if currentPartIndex > #unanchoredParts then
+                currentPartIndex = 1
+            end
+            return
+        end
+        
+        local part = unanchoredParts[i]
+        
+        if part and part.Parent and part:IsA("BasePart") then
+            local success = pcall(function()
+                local distance = (part.Position - targetRoot.Position).Magnitude
+                if distance > 500 then
+                    return
+                end
+                
+                local hasConstraints = false
+                for _, child in pairs(part:GetChildren()) do
+                    if child:IsA("Constraint") then
+                        hasConstraints = true
+                        break
+                    end
+                end
+                
+                if hasConstraints then
+                    deleteAllConstraints(part)
+                end
+                
+                if part:CanSetNetworkOwnership() then
+                    part:SetNetworkOwner(LocalPlayer)
+                end
+                
+                local bodyPos = part:FindFirstChildOfClass("BodyPosition")
+                local bodyGyro = part:FindFirstChildOfClass("BodyGyro")
+                
+                if not bodyPos then
+                    bodyPos = Instance.new("BodyPosition")
+                    bodyPos.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                    bodyPos.D = Settings.Damping
+                    bodyPos.P = Settings.Power
+                    bodyPos.Parent = part
+                    table.insert(bodyMovers, {part = part, mover = bodyPos})
+                end
+                
+                if not bodyGyro and distance < 100 then
+                    bodyGyro = Instance.new("BodyGyro")
+                    bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                    bodyGyro.D = 2000
+                    bodyGyro.P = 20000
+                    bodyGyro.CFrame = part.CFrame
+                    bodyGyro.Parent = part
+                    table.insert(bodyMovers, {part = part, mover = bodyGyro})
+                end
+                
+                -- FIXED: Parts berputar di sekitar target, TIDAK menabrak langsung
+                local angle = tick() * 2 + (i * 0.5) -- Rotasi berbeda untuk tiap part
+                local radius = math.clamp(distance * 0.3, 8, 15) -- Radius orbit 8-15 studs
+                
+                local offset = Vector3.new(
+                    math.cos(angle) * radius,
+                    math.sin(tick() * 3 + i) * 5 + 8, -- Naik turun smooth
+                    math.sin(angle) * radius
+                )
+                
+                if bodyPos then
+                    -- Target posisi adalah SEKITAR player, bukan tepat di player
+                    bodyPos.Position = targetRoot.Position + offset
+                end
+                
+                part.CanCollide = false
+                
+                -- Velocity boost hanya untuk part yang jauh
+                if distance > 30 then
+                    local direction = (targetRoot.Position + offset - part.Position).Unit
+                    part.AssemblyLinearVelocity = direction * Settings.VelocityBoost
+                else
+                    -- Kurangi kecepatan saat sudah dekat untuk tidak menabrak
+                    part.AssemblyLinearVelocity = part.AssemblyLinearVelocity * 0.8
+                end
+            end)
+            
+            if success then
+                partsProcessed = partsProcessed + 1
+            end
+        end
+    end
+    
+    if currentPartIndex > #unanchoredParts then
+        currentPartIndex = 1
+    end
+end
+
+-- Fungsi cleanup body movers - OPTIMIZED
+local function cleanupBodyMovers()
+    local moversToClean = {}
+    
+    for _, data in pairs(bodyMovers) do
+        if data.part and data.part.Parent and data.mover then
+            table.insert(moversToClean, data)
+        end
+    end
+    
+    for i, data in ipairs(moversToClean) do
+        pcall(function()
+            data.mover:Destroy()
+            if data.part then
+                data.part.CanCollide = true
+            end
+        end)
+        
+        if i % 10 == 0 then
+            wait()
+        end
+    end
+    
+    bodyMovers = {}
+    processedParts = {}
+end
+
+-- Fungsi update player list - COMPACT VERSION
+local function updatePlayerList(listFrame, listLayout, partsValue, playersValue, bringBtn)
+    for _, child in pairs(listFrame:GetChildren()) do
+        if child:IsA("TextButton") or child:IsA("TextLabel") then
+            child:Destroy()
+        end
+    end
+    
+    getNearbyPlayers()
+    
+    if #nearbyPlayers == 0 then
+        local NoPlayerLabel = Instance.new("TextLabel")
+        NoPlayerLabel.Size = UDim2.new(1, -6, 0, 36)
+        NoPlayerLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+        NoPlayerLabel.BorderSizePixel = 0
+        NoPlayerLabel.Text = "❌ No players nearby"
+        NoPlayerLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        NoPlayerLabel.TextSize = 10
+        NoPlayerLabel.Font = Enum.Font.Gotham
+        NoPlayerLabel.Parent = listFrame
+        
+        local NoPlayerCorner = Instance.new("UICorner")
+        NoPlayerCorner.CornerRadius = UDim.new(0, 5)
+        NoPlayerCorner.Parent = NoPlayerLabel
+        
+        local NoPlayerBorder = Instance.new("UIStroke")
+        NoPlayerBorder.Color = Color3.fromRGB(0, 255, 0)
+        NoPlayerBorder.Thickness = 1
+        NoPlayerBorder.Parent = NoPlayerLabel
+    else
+        for i, data in ipairs(nearbyPlayers) do
+            local PlayerBtn = Instance.new("TextButton")
+            PlayerBtn.Name = "PlayerBtn_" .. data.player.Name
+            PlayerBtn.Size = UDim2.new(1, -6, 0, 32)
+            PlayerBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+            PlayerBtn.BorderSizePixel = 0
+            PlayerBtn.Text = ""
+            PlayerBtn.AutoButtonColor = false
+            
+            local BtnCorner = Instance.new("UICorner")
+            BtnCorner.CornerRadius = UDim.new(0, 5)
+            BtnCorner.Parent = PlayerBtn
+            
+            local BtnBorder = Instance.new("UIStroke")
+            BtnBorder.Name = "Border"
+            BtnBorder.Color = Color3.fromRGB(0, 200, 0)
+            BtnBorder.Thickness = 1
+            BtnBorder.Transparency = 0.5
+            BtnBorder.Parent = PlayerBtn
+            
+            -- Avatar Circle
+            local AvatarCircle = Instance.new("Frame")
+            AvatarCircle.Size = UDim2.new(0, 24, 0, 24)
+            AvatarCircle.Position = UDim2.new(0, 5, 0.5, -12)
+            AvatarCircle.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+            AvatarCircle.BorderSizePixel = 0
+            AvatarCircle.Parent = PlayerBtn
+            
+            local AvatarCorner = Instance.new("UICorner")
+            AvatarCorner.CornerRadius = UDim.new(1, 0)
+            AvatarCorner.Parent = AvatarCircle
+            
+            local AvatarBorder = Instance.new("UIStroke")
+            AvatarBorder.Color = Color3.fromRGB(0, 255, 0)
+            AvatarBorder.Thickness = 1.5
+            AvatarBorder.Parent = AvatarCircle
+            
+            local AvatarIcon = Instance.new("TextLabel")
+            AvatarIcon.Size = UDim2.new(1, 0, 1, 0)
+            AvatarIcon.BackgroundTransparency = 1
+            AvatarIcon.Text = "👤"
+            AvatarIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+            AvatarIcon.TextSize = 13
+            AvatarIcon.Font = Enum.Font.GothamBold
+            AvatarIcon.Parent = AvatarCircle
+            
+            -- Player Name
+            local PlayerName = Instance.new("TextLabel")
+            PlayerName.Size = UDim2.new(1, -80, 0, 13)
+            PlayerName.Position = UDim2.new(0, 33, 0, 5)
+            PlayerName.BackgroundTransparency = 1
+            PlayerName.Text = data.player.Name
+            PlayerName.TextColor3 = Color3.fromRGB(255, 255, 255)
+            PlayerName.TextSize = 10
+            PlayerName.Font = Enum.Font.GothamBold
+            PlayerName.TextXAlignment = Enum.TextXAlignment.Left
+            PlayerName.TextTruncate = Enum.TextTruncate.AtEnd
+            PlayerName.Parent = PlayerBtn
+            
+            -- Distance Badge
+            local DistanceBadge = Instance.new("Frame")
+            DistanceBadge.Size = UDim2.new(0, 55, 0, 14)
+            DistanceBadge.Position = UDim2.new(0, 33, 0, 18)
+            DistanceBadge.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+            DistanceBadge.BorderSizePixel = 0
+            DistanceBadge.Parent = PlayerBtn
+            
+            local BadgeCorner = Instance.new("UICorner")
+            BadgeCorner.CornerRadius = UDim.new(0, 4)
+            BadgeCorner.Parent = DistanceBadge
+            
+            local DistanceText = Instance.new("TextLabel")
+            DistanceText.Size = UDim2.new(1, 0, 1, 0)
+            DistanceText.BackgroundTransparency = 1
+            DistanceText.Text = data.distance .. " m"
+            DistanceText.TextColor3 = Color3.fromRGB(255, 255, 255)
+            DistanceText.TextSize = 8
+            DistanceText.Font = Enum.Font.GothamBold
+            DistanceText.Parent = DistanceBadge
+            
+            -- Selection Indicator
+            local SelectIndicator = Instance.new("Frame")
+            SelectIndicator.Name = "SelectIndicator"
+            SelectIndicator.Size = UDim2.new(0, 3, 0, 22)
+            SelectIndicator.Position = UDim2.new(1, -5, 0.5, -11)
+            SelectIndicator.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+            SelectIndicator.BorderSizePixel = 0
+            SelectIndicator.Visible = false
+            SelectIndicator.Parent = PlayerBtn
+            
+            local IndicatorCorner = Instance.new("UICorner")
+            IndicatorCorner.CornerRadius = UDim.new(1, 0)
+            IndicatorCorner.Parent = SelectIndicator
+            
+            -- Hover Effects
+            PlayerBtn.MouseEnter:Connect(function()
+                BtnBorder.Transparency = 0
+                game:GetService("TweenService"):Create(PlayerBtn, TweenInfo.new(0.2), {
+                    BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+                }):Play()
+            end)
+            
+            PlayerBtn.MouseLeave:Connect(function()
+                if targetPlayer ~= data.player then
+                    BtnBorder.Transparency = 0.5
+                    game:GetService("TweenService"):Create(PlayerBtn, TweenInfo.new(0.2), {
+                        BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                    }):Play()
+                end
+            end)
+            
+            -- Click event
+            PlayerBtn.MouseButton1Click:Connect(function()
+                targetPlayer = data.player
+                
+                for _, btn in pairs(listFrame:GetChildren()) do
+                    if btn:IsA("TextButton") then
+                        local indicator = btn:FindFirstChild("SelectIndicator")
+                        if indicator then
+                            indicator.Visible = false
+                        end
+                        local border = btn:FindFirstChild("Border")
+                        if border then
+                            border.Transparency = 0.5
+                        end
+                        btn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                    end
+                end
+                
+                SelectIndicator.Visible = true
+                PlayerBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+                BtnBorder.Transparency = 0
+                
+                notify("✅ Target Selected", data.player.Name .. " (" .. data.distance .. " studs)", 2)
+            end)
+            
+            PlayerBtn.Parent = listFrame
+        end
+    end
+    
+    listFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 6)
+    
+    local partCount = scanUnanchoredParts()
+    partsValue.Text = tostring(partCount)
+    playersValue.Text = tostring(#nearbyPlayers)
+end
+
+-- Main Program
+local ScreenGui, MainFrame, BringBtn, RefreshBtn, MinimizeBtn, CloseBtn, PlayerListFrame, PartsValue, PlayersValue, ListLayout, BringText, ContentFrame, NeonBorder, RadiusInput, PowerInput = createGUI()
+
+-- Input handling untuk Radius
+RadiusInput.FocusLost:Connect(function(enterPressed)
+    local input = RadiusInput.Text:gsub("[^%d]", "") -- Hanya ambil angka
+    local value = tonumber(input)
+    
+    if value and value >= 50 and value <= 1000 then
+        Settings.Radius = value
+        RadiusInput.Text = value .. " studs"
+        updatePlayerList(PlayerListFrame, ListLayout, PartsValue, PlayersValue, BringBtn)
+        notify("✅ Radius Updated", "Set to " .. value .. " studs", 2)
+    else
+        RadiusInput.Text = Settings.Radius .. " studs"
+        notify("⚠️ Invalid", "Radius must be 50-1000", 2)
+    end
+end)
+
+-- Input handling untuk Power
+PowerInput.FocusLost:Connect(function(enterPressed)
+    local input = PowerInput.Text:gsub("[^%d]", "")
+    local value = tonumber(input)
+    
+    if value and value >= 5000 and value <= 200000 then
+        Settings.Power = value
+        Settings.Damping = math.floor(value / 10)
+        Settings.VelocityBoost = math.floor(50 + ((value - 5000) / 195000) * 150)
+        PowerInput.Text = tostring(value)
+        notify("✅ Power Updated", "Set to " .. value, 2)
+    else
+        PowerInput.Text = tostring(Settings.Power)
+        notify("⚠️ Invalid", "Power must be 5000-200000", 2)
+    end
+end)
+
+updatePlayerList(PlayerListFrame, ListLayout, PartsValue, PlayersValue, BringBtn)
+
+notify("✅ Loaded", "Compact GUI Ready!", 3)
+notify("🎯 Select", "Choose target from list", 2)
+
+-- Event Handlers
+BringBtn.MouseButton1Click:Connect(function()
+    if not bringing then
+        if not targetPlayer then
+            notify("⚠️ Warning", "Select target first!", 3)
+            return
+        end
+        
+        if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            notify("❌ Error", "Invalid target!", 3)
+            return
+        end
+        
+        bringing = true
+        BringText.Text = "PULLING..."
+        
+        local TweenService = game:GetService("TweenService")
+        TweenService:Create(BringBtn, TweenInfo.new(0.3), {
+            BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+        }):Play()
+        
+        notify("✅ Started", "Pulling parts to " .. targetPlayer.Name, 2)
+        
+        currentPartIndex = 1
+        processedParts = {}
+        
+        bringConnection = RunService.Heartbeat:Connect(function()
+            if bringing then
+                bringPartsPhysical()
+            end
+        end)
+    else
+        bringing = false
+        BringText.Text = "BRING"
+        
+        local TweenService = game:GetService("TweenService")
+        TweenService:Create(BringBtn, TweenInfo.new(0.3), {
+            BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        }):Play()
+        
+        if bringConnection then
+            bringConnection:Disconnect()
+        end
+        
+        cleanupBodyMovers()
+        
+        notify("⏹️ Stopped", "Pulling stopped", 2)
+    end
+end)
+
+RefreshBtn.MouseButton1Click:Connect(function()
+    updatePlayerList(PlayerListFrame, ListLayout, PartsValue, PlayersValue, BringBtn)
+    notify("🔄 Refreshed", "Data updated!", 2)
+end)
+
+-- Minimize functionality
+local isMinimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    
+    local TweenService = game:GetService("TweenService")
+    
+    if isMinimized then
+        ContentFrame.Visible = false
+        
+        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 270, 0, 42)
+        }):Play()
+        MinimizeBtn.Text = "☐"
+    else
+        ContentFrame.Visible = true
+        
+        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 270, 0, 385)
+        }):Play()
+        MinimizeBtn.Text = "─"
+    end
+end)
+
+-- Close functionality
+CloseBtn.MouseButton1Click:Connect(function()
+    if bringing and bringConnection then
+        bringConnection:Disconnect()
+    end
+    
+    cleanupBodyMovers()
+    ScreenGui:Destroy()
+    notify("👋 Closed", "GUI closed", 2)
+end)
+
+-- Auto refresh player list
+spawn(function()
+    while ScreenGui.Parent do
+        wait(3)
+        if not bringing then
+            updatePlayerList(PlayerListFrame, ListLayout, PartsValue, PlayersValue, BringBtn)
+        end
+    end
+end)
+
+-- Animasi loading
+spawn(function()
+    local TweenService = game:GetService("TweenService")
+    MainFrame.Size = UDim2.new(0, 270, 0, 0)
+    TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 270, 0, 385)
+    }):Play()
+end)
+
+print("═══════════════════════════════════════════")
+print("✅ COMPACT ANDROID GUI - LOADED")
+print("═══════════════════════════════════════════")
+print("🎨 Style: Black BG + Neon Green Border")
+print("📱 Size: 270x385 (Compact for Android)")
+print("⚡ Fixed layout - No overlapping!")
+print("═══════════════════════════════════════════")
+print("⚙️ INPUT SETTINGS:")
+print("   • Radius: Type 50-1000 studs")
+print("   • Power: Type 5000-200000")
+print("   • Auto Damping & Velocity Boost")
+print("═══════════════════════════════════════════")
