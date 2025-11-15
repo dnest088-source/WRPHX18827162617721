@@ -1,0 +1,551 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+-- Variabel Global
+local magnetEnabled = false
+local targetPart = nil
+local moveSpeed = 3
+local searchRadius = 50
+local heightOffset = 0
+local sideOffset = 0
+local forwardOffset = -5
+local bodyPos = nil
+local bodyGyro = nil
+local isMinimized = false
+
+-- Fungsi untuk mencari part terdekat
+local function findNearestPart()
+    local nearestPart = nil
+    local minDistance = searchRadius
+    
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name ~= "Terrain" and not obj:IsDescendantOf(character) then
+            local isPlayerPart = false
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr.Character and obj:IsDescendantOf(plr.Character) then
+                    isPlayerPart = true
+                    break
+                end
+            end
+            
+            if not isPlayerPart then
+                local distance = (obj.Position - humanoidRootPart.Position).Magnitude
+                if distance < minDistance then
+                    minDistance = distance
+                    nearestPart = obj
+                end
+            end
+        end
+    end
+    
+    return nearestPart
+end
+
+-- Fungsi untuk delete semua rope
+local function deleteAllRopes()
+    local ropeCount = 0
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("RopeConstraint") or obj:IsA("Rope") then
+            obj:Destroy()
+            ropeCount = ropeCount + 1
+        end
+    end
+    print("Deleted " .. ropeCount .. " ropes!")
+    return ropeCount
+end
+
+-- Fungsi untuk toggle magnet
+local function toggleMagnet()
+    magnetEnabled = not magnetEnabled
+    
+    if magnetEnabled then
+        targetPart = findNearestPart()
+        if targetPart then
+            targetPart.Anchored = false
+            targetPart.CanCollide = false
+            
+            bodyGyro = Instance.new("BodyGyro")
+            bodyGyro.Name = "MagnetGyro"
+            bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+            bodyGyro.CFrame = targetPart.CFrame
+            bodyGyro.P = 50000
+            bodyGyro.D = 5000
+            bodyGyro.Parent = targetPart
+            
+            bodyPos = Instance.new("BodyPosition")
+            bodyPos.Name = "MagnetPosition"
+            bodyPos.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bodyPos.P = 50000
+            bodyPos.D = 5000
+            bodyPos.Parent = targetPart
+            
+            pcall(function()
+                targetPart:SetNetworkOwner(player)
+            end)
+            
+            heightOffset = 0
+            sideOffset = 0
+            forwardOffset = -5
+            
+            print("Magnet Enabled - Target: " .. targetPart.Name)
+        else
+            magnetEnabled = false
+            print("Tidak ada part terdekat!")
+        end
+    else
+        if targetPart then
+            targetPart.CanCollide = true
+            if bodyGyro then
+                bodyGyro:Destroy()
+                bodyGyro = nil
+            end
+            if bodyPos then
+                bodyPos:Destroy()
+                bodyPos = nil
+            end
+        end
+        targetPart = nil
+        print("Magnet Disabled")
+    end
+end
+
+-- Fungsi untuk menggerakkan part
+local function movePart(direction)
+    if magnetEnabled and targetPart then
+        if direction == "up" then
+            heightOffset = heightOffset + moveSpeed
+        elseif direction == "down" then
+            heightOffset = heightOffset - moveSpeed
+        elseif direction == "left" then
+            sideOffset = sideOffset - moveSpeed
+        elseif direction == "right" then
+            sideOffset = sideOffset + moveSpeed
+        elseif direction == "forward" then
+            forwardOffset = forwardOffset - moveSpeed
+        elseif direction == "backward" then
+            forwardOffset = forwardOffset + moveSpeed
+        end
+    end
+end
+
+-- Update loop untuk magnet
+RunService.Heartbeat:Connect(function()
+    if magnetEnabled and targetPart and humanoidRootPart and bodyPos then
+        pcall(function()
+            local targetCFrame = humanoidRootPart.CFrame * CFrame.new(sideOffset, heightOffset, forwardOffset)
+            bodyPos.Position = targetCFrame.Position
+            
+            if bodyGyro then
+                bodyGyro.CFrame = targetPart.CFrame
+            end
+            
+            if targetPart.AssemblyLinearVelocity.Magnitude > 0.1 then
+                targetPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            end
+            if targetPart.AssemblyAngularVelocity.Magnitude > 0.1 then
+                targetPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+            end
+        end)
+    end
+end)
+
+-- Buat GUI
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local UICorner = Instance.new("UICorner")
+local UIStroke = Instance.new("UIStroke")
+
+local TitleBar = Instance.new("Frame")
+local TitleCorner = Instance.new("UICorner")
+local TitleLabel = Instance.new("TextLabel")
+local MinimizeButton = Instance.new("TextButton")
+local MinCorner = Instance.new("UICorner")
+local CloseButton = Instance.new("TextButton")
+local CloseCorner = Instance.new("UICorner")
+
+local ContentFrame = Instance.new("Frame")
+
+local ToggleButton = Instance.new("TextButton")
+local ToggleCorner = Instance.new("UICorner")
+
+local StatusLabel = Instance.new("TextLabel")
+
+local RadiusFrame = Instance.new("Frame")
+local RadiusLabel = Instance.new("TextLabel")
+local RadiusBox = Instance.new("TextBox")
+local RadiusBoxCorner = Instance.new("UICorner")
+
+local PowerFrame = Instance.new("Frame")
+local PowerLabel = Instance.new("TextLabel")
+local PowerBox = Instance.new("TextBox")
+local PowerBoxCorner = Instance.new("UICorner")
+
+local DeleteRopeButton = Instance.new("TextButton")
+local DeleteCorner = Instance.new("UICorner")
+
+local ControlFrame = Instance.new("Frame")
+
+-- Setup ScreenGui
+ScreenGui.Name = "MagnetPartMoverGUI"
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+-- Main Frame
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -220)
+MainFrame.Size = UDim2.new(0, 250, 0, 440)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = MainFrame
+
+UIStroke.Color = Color3.fromRGB(0, 255, 100)
+UIStroke.Thickness = 2
+UIStroke.Parent = MainFrame
+
+-- Title Bar
+TitleBar.Name = "TitleBar"
+TitleBar.Parent = MainFrame
+TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+
+TitleCorner.CornerRadius = UDim.new(0, 12)
+TitleCorner.Parent = TitleBar
+
+-- Title Label
+TitleLabel.Name = "TitleLabel"
+TitleLabel.Parent = TitleBar
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.Size = UDim2.new(0.55, 0, 1, 0)
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.Text = "Warpah Controller"
+TitleLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+TitleLabel.TextSize = 14
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Minimize Button
+MinimizeButton.Name = "MinimizeButton"
+MinimizeButton.Parent = TitleBar
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
+MinimizeButton.Position = UDim2.new(1, -60, 0, 7)
+MinimizeButton.Size = UDim2.new(0, 25, 0, 25)
+MinimizeButton.Font = Enum.Font.GothamBold
+MinimizeButton.Text = "─"
+MinimizeButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+MinimizeButton.TextSize = 16
+
+MinCorner.CornerRadius = UDim.new(0, 6)
+MinCorner.Parent = MinimizeButton
+
+-- Close Button
+CloseButton.Name = "CloseButton"
+CloseButton.Parent = TitleBar
+CloseButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+CloseButton.Position = UDim2.new(1, -32, 0, 7)
+CloseButton.Size = UDim2.new(0, 25, 0, 25)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextSize = 14
+
+CloseCorner.CornerRadius = UDim.new(0, 6)
+CloseCorner.Parent = CloseButton
+
+-- Content Frame
+ContentFrame.Name = "ContentFrame"
+ContentFrame.Parent = MainFrame
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Position = UDim2.new(0, 0, 0, 40)
+ContentFrame.Size = UDim2.new(1, 0, 1, -40)
+
+-- Toggle Button
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Parent = ContentFrame
+ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ToggleButton.Position = UDim2.new(0.08, 0, 0, 10)
+ToggleButton.Size = UDim2.new(0.84, 0, 0, 38)
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.Text = "🔴 Enable"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.TextSize = 13
+
+ToggleCorner.CornerRadius = UDim.new(0, 8)
+ToggleCorner.Parent = ToggleButton
+
+-- Status Label
+StatusLabel.Name = "StatusLabel"
+StatusLabel.Parent = ContentFrame
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Position = UDim2.new(0.08, 0, 0, 53)
+StatusLabel.Size = UDim2.new(0.84, 0, 0, 20)
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.Text = "Status: Disabled"
+StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+StatusLabel.TextSize = 11
+
+-- Radius Frame
+RadiusFrame.Name = "RadiusFrame"
+RadiusFrame.Parent = ContentFrame
+RadiusFrame.BackgroundTransparency = 1
+RadiusFrame.Position = UDim2.new(0.08, 0, 0, 78)
+RadiusFrame.Size = UDim2.new(0.84, 0, 0, 28)
+
+-- Radius Label
+RadiusLabel.Name = "RadiusLabel"
+RadiusLabel.Parent = RadiusFrame
+RadiusLabel.BackgroundTransparency = 1
+RadiusLabel.Size = UDim2.new(0.38, 0, 1, 0)
+RadiusLabel.Font = Enum.Font.GothamBold
+RadiusLabel.Text = "Radius:"
+RadiusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+RadiusLabel.TextSize = 12
+RadiusLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Radius Box
+RadiusBox.Name = "RadiusBox"
+RadiusBox.Parent = RadiusFrame
+RadiusBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+RadiusBox.Position = UDim2.new(0.42, 0, 0, 0)
+RadiusBox.Size = UDim2.new(0.58, 0, 1, 0)
+RadiusBox.Font = Enum.Font.GothamBold
+RadiusBox.Text = "50"
+RadiusBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+RadiusBox.TextSize = 12
+RadiusBox.PlaceholderText = "Enter..."
+
+RadiusBoxCorner.CornerRadius = UDim.new(0, 6)
+RadiusBoxCorner.Parent = RadiusBox
+
+-- Power Frame
+PowerFrame.Name = "PowerFrame"
+PowerFrame.Parent = ContentFrame
+PowerFrame.BackgroundTransparency = 1
+PowerFrame.Position = UDim2.new(0.08, 0, 0, 112)
+PowerFrame.Size = UDim2.new(0.84, 0, 0, 28)
+
+-- Power Label
+PowerLabel.Name = "PowerLabel"
+PowerLabel.Parent = PowerFrame
+PowerLabel.BackgroundTransparency = 1
+PowerLabel.Size = UDim2.new(0.38, 0, 1, 0)
+PowerLabel.Font = Enum.Font.GothamBold
+PowerLabel.Text = "Power:"
+PowerLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+PowerLabel.TextSize = 12
+PowerLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Power Box
+PowerBox.Name = "PowerBox"
+PowerBox.Parent = PowerFrame
+PowerBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+PowerBox.Position = UDim2.new(0.42, 0, 0, 0)
+PowerBox.Size = UDim2.new(0.58, 0, 1, 0)
+PowerBox.Font = Enum.Font.GothamBold
+PowerBox.Text = "3"
+PowerBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+PowerBox.TextSize = 12
+PowerBox.PlaceholderText = "1-10"
+
+PowerBoxCorner.CornerRadius = UDim.new(0, 6)
+PowerBoxCorner.Parent = PowerBox
+
+-- Delete Rope Button
+DeleteRopeButton.Name = "DeleteRopeButton"
+DeleteRopeButton.Parent = ContentFrame
+DeleteRopeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+DeleteRopeButton.Position = UDim2.new(0.08, 0, 0, 146)
+DeleteRopeButton.Size = UDim2.new(0.84, 0, 0, 35)
+DeleteRopeButton.Font = Enum.Font.GothamBold
+DeleteRopeButton.Text = "🗑️ Delete Ropes"
+DeleteRopeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+DeleteRopeButton.TextSize = 12
+
+DeleteCorner.CornerRadius = UDim.new(0, 8)
+DeleteCorner.Parent = DeleteRopeButton
+
+-- Control Frame
+ControlFrame.Name = "ControlFrame"
+ControlFrame.Parent = ContentFrame
+ControlFrame.BackgroundTransparency = 1
+ControlFrame.Position = UDim2.new(0.08, 0, 0, 189)
+ControlFrame.Size = UDim2.new(0.84, 0, 0, 210)
+
+-- Function untuk membuat button
+local function createControlButton(name, text, position, size, color)
+    local button = Instance.new("TextButton")
+    button.Name = name
+    button.Parent = ControlFrame
+    button.BackgroundColor3 = color or Color3.fromRGB(0, 200, 80)
+    button.Position = position
+    button.Size = size
+    button.Font = Enum.Font.GothamBold
+    button.Text = text
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.TextSize = 18
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = button
+    
+    return button
+end
+
+-- Create Control Buttons
+local UpButton = createControlButton("UpButton", "↑", UDim2.new(0.35, 0, 0, 0), UDim2.new(0.3, 0, 0, 48))
+local DownButton = createControlButton("DownButton", "↓", UDim2.new(0.35, 0, 0, 162), UDim2.new(0.3, 0, 0, 48))
+local LeftButton = createControlButton("LeftButton", "←", UDim2.new(0, 0, 0, 56), UDim2.new(0.3, 0, 0, 48))
+local RightButton = createControlButton("RightButton", "→", UDim2.new(0.7, 0, 0, 56), UDim2.new(0.3, 0, 0, 48))
+local ForwardButton = createControlButton("ForwardButton", "▲", UDim2.new(0.35, 0, 0, 56), UDim2.new(0.3, 0, 0, 48), Color3.fromRGB(0, 150, 255))
+local BackwardButton = createControlButton("BackwardButton", "▼", UDim2.new(0.35, 0, 0, 108), UDim2.new(0.3, 0, 0, 48), Color3.fromRGB(0, 150, 255))
+
+-- Button Functions
+ToggleButton.MouseButton1Click:Connect(function()
+    toggleMagnet()
+    if magnetEnabled then
+        ToggleButton.Text = "🟢 Disable"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        StatusLabel.Text = "Status: Active ✓"
+        StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    else
+        ToggleButton.Text = "🔴 Enable"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        StatusLabel.Text = "Status: Disabled"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+end)
+
+MinimizeButton.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        ContentFrame.Visible = false
+        MainFrame.Size = UDim2.new(0, 250, 0, 40)
+        MinimizeButton.Text = "+"
+    else
+        ContentFrame.Visible = true
+        MainFrame.Size = UDim2.new(0, 250, 0, 440)
+        MinimizeButton.Text = "─"
+    end
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+    magnetEnabled = false
+    if bodyGyro then bodyGyro:Destroy() end
+    if bodyPos then bodyPos:Destroy() end
+end)
+
+-- Radius TextBox
+RadiusBox.FocusLost:Connect(function()
+    local newRadius = tonumber(RadiusBox.Text)
+    if newRadius and newRadius > 0 and newRadius <= 500 then
+        searchRadius = newRadius
+        print("Search radius updated to: " .. searchRadius)
+        StatusLabel.Text = "Radius: " .. searchRadius
+        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+        wait(2)
+        if magnetEnabled then
+            StatusLabel.Text = "Status: Active ✓"
+            StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        else
+            StatusLabel.Text = "Status: Disabled"
+            StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        end
+    else
+        RadiusBox.Text = tostring(searchRadius)
+        StatusLabel.Text = "Invalid (1-500)"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+end)
+
+-- Power TextBox
+PowerBox.FocusLost:Connect(function()
+    local newPower = tonumber(PowerBox.Text)
+    if newPower and newPower > 0 and newPower <= 10 then
+        moveSpeed = newPower
+        print("Move power updated to: " .. moveSpeed)
+        StatusLabel.Text = "Power: " .. moveSpeed
+        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+        wait(2)
+        if magnetEnabled then
+            StatusLabel.Text = "Status: Active ✓"
+            StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        else
+            StatusLabel.Text = "Status: Disabled"
+            StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        end
+    else
+        PowerBox.Text = tostring(moveSpeed)
+        StatusLabel.Text = "Invalid (1-10)"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+end)
+
+-- Delete Rope Button
+DeleteRopeButton.MouseButton1Click:Connect(function()
+    local count = deleteAllRopes()
+    StatusLabel.Text = "Deleted " .. count .. " ropes!"
+    StatusLabel.TextColor3 = Color3.fromRGB(255, 150, 50)
+    wait(2)
+    if magnetEnabled then
+        StatusLabel.Text = "Status: Active ✓"
+        StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    else
+        StatusLabel.Text = "Status: Disabled"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+end)
+
+-- Control Buttons
+UpButton.MouseButton1Click:Connect(function()
+    if magnetEnabled then
+        movePart("up")
+        StatusLabel.Text = "Height: +" .. math.floor(heightOffset)
+    end
+end)
+
+DownButton.MouseButton1Click:Connect(function()
+    if magnetEnabled then
+        movePart("down")
+        StatusLabel.Text = "Height: " .. math.floor(heightOffset)
+    end
+end)
+
+LeftButton.MouseButton1Click:Connect(function()
+    if magnetEnabled then
+        movePart("left")
+        StatusLabel.Text = "Side: " .. math.floor(sideOffset)
+    end
+end)
+
+RightButton.MouseButton1Click:Connect(function()
+    if magnetEnabled then
+        movePart("right")
+        StatusLabel.Text = "Side: +" .. math.floor(sideOffset)
+    end
+end)
+
+ForwardButton.MouseButton1Click:Connect(function()
+    if magnetEnabled then
+        movePart("forward")
+        StatusLabel.Text = "Forward: " .. math.floor(math.abs(forwardOffset))
+    end
+end)
+
+BackwardButton.MouseButton1Click:Connect(function()
+    if magnetEnabled then
+        movePart("backward")
+        StatusLabel.Text = "Backward: " .. math.floor(math.abs(forwardOffset))
+    end
+end)
+
+print("✅ Magnet Part Mover Loaded!")
+print("📱 Compact GUI for Mobile")
+print("🎮 Ready to use!")
