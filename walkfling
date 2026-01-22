@@ -1,11 +1,3 @@
--- Warpah Fling GUI - Improved Version
--- Touch fling gui with minimalist design
-
--- Gui to Lua (VIP VERSION)
--- Version: 7.0
-
--- Instances:
-
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
 local TopFrame = Instance.new("Frame")
