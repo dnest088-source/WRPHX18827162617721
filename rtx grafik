@@ -1,6 +1,3 @@
--- Warpah RTX Graphics Enhancement Script - FIXED VERSION v2
--- Fixed: Player blur issue & Weather switching
-
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
@@ -874,8 +871,4 @@ end)
 wait(0.6)
 showNotification("Warpah RTX Loaded!")
 
-print("🎮 Warpah RTX Graphics System v2 - FIXED")
-print("✅ Player blur issue FIXED - No blur on player")
-print("✅ Weather switching FIXED - Smooth transitions")
-print("⚡ Professional RTX weather control ready")
-print("🌟 Enhanced realistic graphics enabled")
+
